@@ -1,11 +1,11 @@
 # Compila cada módulo por separado: no enlaza ni exige que otros módulos
 # o main() estén implementados todavía.
 
-CXX       ?= g++ # Compilador de c++
-CPPFLAGS  ?= -Iinclude # esto es opciones del preprocesador para permitir encontrar las cabeceras
-CXXFLAGS  ?= -std=c++17 -Wall -Wextra -Wpedantic -O2 # advertencias y para optimizacion
-OPENMP    ?= -fopenmp # para activar el OpenMP
-BUILD_DIR ?= build # directorio de construcción
+CXX       ?= g++
+CPPFLAGS  ?= -Iinclude
+CXXFLAGS  ?= -std=c++17 -Wall -Wextra -Wpedantic -O2
+OPENMP    ?= -fopenmp
+BUILD_DIR ?= build
 
 # Direcciones para encontrar los archivos correspondientes
 SOURCES   := $(sort $(wildcard src/*.cpp))
@@ -15,7 +15,7 @@ TESTS     := $(sort $(wildcard tests/*.cpp))
 TEST_OBJS := $(patsubst tests/%.cpp,$(BUILD_DIR)/tests/%.o,$(TESTS))
 
 .DEFAULT_GOAL := all
-.PHONY: all clean test $(MODULES)
+.PHONY: all clean test test-role3 test-integration $(MODULES)
 
 # make: compila todos los .cpp disponibles como unidades independientes.
 all: $(OBJECTS)
@@ -27,14 +27,25 @@ $(BUILD_DIR)/%.o: src/%.cpp
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(OPENMP) -MMD -MP -c $< -o $@
 
-# Las pruebas también se compilan de forma independiente: así pueden existir
-# referencias a módulos que otra rama todavía no haya implementado.
-test: $(TEST_OBJS)
-	@if [ -z "$(TESTS)" ]; then \
-	  echo "No hay archivos de prueba en tests/*.cpp todavía."; \
-	else \
-	  echo "Pruebas compiladas. El enlace/ejecución depende de las pruebas de cada módulo."; \
-	fi
+# En esta rama, test valida el rol 3 con sustitutos de los roles 1 y 2.
+# Después del merge, test-integration enlaza las implementaciones reales.
+test: test-role3
+
+test-role3: $(BUILD_DIR)/test_fft2d
+	$(abspath $(BUILD_DIR)/test_fft2d)
+
+$(BUILD_DIR)/test_fft2d: $(BUILD_DIR)/tests/standalone/test_fft2d.o $(BUILD_DIR)/Fft2D.o
+	$(CXX) $(CXXFLAGS) $(OPENMP) $^ -o $@
+
+$(BUILD_DIR)/tests/standalone/test_fft2d.o: tests/test_fft2d.cpp
+	@mkdir -p $(BUILD_DIR)/tests/standalone
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(OPENMP) -DFFT2D_STANDALONE_STUBS -MMD -MP -c $< -o $@
+
+test-integration: $(BUILD_DIR)/test_fft2d_integration
+	$(abspath $(BUILD_DIR)/test_fft2d_integration)
+
+$(BUILD_DIR)/test_fft2d_integration: $(BUILD_DIR)/tests/test_fft2d.o $(BUILD_DIR)/Fft2D.o $(BUILD_DIR)/ComplexField.o $(BUILD_DIR)/Butterfly1D.o
+	$(CXX) $(CXXFLAGS) $(OPENMP) $^ -o $@
 
 $(BUILD_DIR)/tests/%.o: tests/%.cpp
 	@mkdir -p $(BUILD_DIR)/tests
@@ -44,4 +55,4 @@ $(BUILD_DIR)/tests/%.o: tests/%.cpp
 clean:
 	rm -rf $(BUILD_DIR)
 
--include $(OBJECTS:.o=.d) $(TEST_OBJS:.o=.d)
+-include $(OBJECTS:.o=.d) $(TEST_OBJS:.o=.d) $(BUILD_DIR)/tests/standalone/test_fft2d.d
