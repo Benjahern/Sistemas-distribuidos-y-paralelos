@@ -43,7 +43,13 @@ class ComplexField{
 
         // Toma col y la pone en la columna n de la grilla
         void setCol(int n, const Complex* col);
-        
+
+        void fillImpulse();
+
+        void fillSine(int k, int l);
+
+        void fillRandom(unsigned seed);
+
     private:
         int dimM;
         int dimN;

@@ -1,5 +1,7 @@
 # include "../include/ComplexField.h"
 # include <stdexcept>
+# include <cmath>
+# include <random>
 
 
 ComplexField::ComplexField(int M, int N) : dimM(M),dimN(N) {
@@ -78,6 +80,54 @@ void ComplexField::setCol(int n, const Complex* col){
     int m = 0;
     while(m < dimM){
         at(m,n) = col[m];
+        m++;
+    }
+}
+
+
+// 
+
+void ComplexField::fillImpulse(){
+    int m = 0;
+    while(m < dimM){
+        int n = 0;
+        while(n < dimN){
+            at(m,n) = Complex(0.0, 0.0);
+            n++;
+        }
+        m++;
+    }
+    at(0,0) = Complex(1.0, 0.0);
+}
+
+void ComplexField::fillSine(int k, int l){
+    const double pi = std::acos(-1.0);
+    int m = 0;
+    while(m < dimM){
+        int n = 0;
+        while(n < dimN){
+            double fase = 2.0 * pi * (double (k) * m / dimM + double (l) * n /dimN);
+            at(m,n) = Complex(std::sin(fase), 0.0);
+            n++; 
+        }
+        m++;
+    }
+}
+
+
+void ComplexField::fillRandom(unsigned seed){
+    std::mt19937_64 generador(seed);
+    std::uniform_real_distribution<double> distribucion(-1.0, 1.0);
+
+    int m = 0;
+    while(m < dimM){
+        int n = 0;
+        while(n < dimN){
+            double real = distribucion(generador);
+            double imag = distribucion(generador);
+            at(m,n) = Complex(real, imag);
+            n++;
+        }
         m++;
     }
 }
