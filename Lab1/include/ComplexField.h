@@ -1,58 +1,88 @@
 # pragma once
 # include <vector>
 # include <complex>
+# include <cstddef>
 
 class ComplexField{
 
     public: 
         using Complex = std::complex<double>;
 
-        ComplexField(int M, int N);
+        ComplexField() = default;
 
-        int rows() const {
-            return dimM;
+        ComplexField(size_t M, size_t N);
+
+        ComplexField(size_t M, size_t N, const Complex& initial_value);
+
+        size_t rows() const {
+            return rows_;
         }
-        int cols() const {
-            return dimN;
+        size_t cols() const {
+            return cols_;
         }
 
-        Complex& at(int m, int n);
-        const Complex& at(int m, int n) const;
+        size_t size() const {
+            return data_.size();
+        }
+
+        Complex& at(size_t m, size_t n){
+            return data_[m * cols_ + n];
+        }
+
+        const Complex& at(size_t m, size_t n) const{
+            return data_[m * cols_ + n];
+        }
+
+        Complex& operator()(size_t m, size_t n){
+            return data_[m * cols_ + n];
+        }
+
+        const Complex& operator()(size_t m, size_t n) const{
+            return data_[m * cols_ + n];
+        }
 
         Complex* data(){
-            return values.data();
+            return data_.data();
         }
         const Complex* data() const{
-            return values.data();
+            return data_.data();
         }
 
-        static bool isPowerOf2(int x);
+        Complex* row(size_t m){
+            return data_.data() + m * cols_;
+        }
 
-        static int bitReverse(int x, int bits);
+        const Complex* row(size_t m) const{
+            return data_.data() + m * cols_;
+        }
 
-        static void bitReversePermute(Complex* arr, int n);
+        static bool isPowerOf2(size_t x);
 
-        // Saca la fila m de la grilla y la deja en row (row tiene cols() elementos)
-        void getRow(int m, Complex* row) const;
+        static size_t bitReverse(size_t x, size_t bits);
 
-        // Toma row y la pone en la fila m de la grilla
-        void setRow(int m, const Complex* row);
+        static void bitReversePermute(Complex* arr, size_t n);
+
+        // Saca la fila m de la grilla y la deja en fila (fila tiene cols() elementos)
+        void getRow(size_t m, Complex* fila) const;
+
+        // Toma fila y la pone en la fila m de la grilla
+        void setRow(size_t m, const Complex* fila);
   
-        // Saca la columna n de la grilla y la deja en col (col tiene rows() elementos)
-        void getCol(int n, Complex* col) const;
+        // Saca la columna n de la grilla y la deja en columna (columna tiene rows() elementos)
+        void getCol(size_t n, Complex* columna) const;
 
-        // Toma col y la pone en la columna n de la grilla
-        void setCol(int n, const Complex* col);
+        // Toma columna y la pone en la columna n de la grilla
+        void setCol(size_t n, const Complex* columna);
 
         void fillImpulse();
 
-        void fillSine(int k, int l);
+        void fillSine(size_t k, size_t l);
 
         void fillRandom(unsigned seed);
 
     private:
-        int dimM;
-        int dimN;
-        std::vector<Complex> values;
+        size_t rows_{0};
+        size_t cols_{0};
+        std::vector<Complex> data_;
 
 };
