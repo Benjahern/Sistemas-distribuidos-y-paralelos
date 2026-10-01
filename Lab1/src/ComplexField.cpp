@@ -2,6 +2,10 @@
 # include <cmath>
 # include <random>
 # include <utility>
+# include <fstream>
+# include <iomanip>
+# include <stdexcept>
+# include <string>
 
 ComplexField::ComplexField(size_t M, size_t N)
     : rows_(M), cols_(N), data_(M * N, Complex(0.0, 0.0)) {}
@@ -112,5 +116,58 @@ void ComplexField::fillRandom(unsigned seed){
             n++;
         }
         m++;
+    }
+}
+
+void ComplexField::writeDat(const std::string& path) const{
+    std::ofstream archivo(path);
+    if(!archivo){
+        throw std::runtime_error("No se pudo abrir el archivo para poder escribir: "+path);
+
+    }
+
+    archivo <<std::setprecision(17);
+    archivo << "# " << rows_ << " " << cols_ << "\n";
+    size_t m = 0;
+    while(m < rows_){
+        size_t n = 0;
+        while(n < cols_){
+            archivo << m << " " << n << " " << at(m,n).real() << " " << at(m,n).imag() << "\n";
+            n++;
+        }
+        m++;
+    }
+}
+
+
+void ComplexField::readDat(const std::string& path){
+    std::ifstream archivo(path);
+    if(!archivo){
+        throw std::runtime_error("No se pudo abrir el archivo para poder leer: "+path);
+    }
+
+    std::string marca;
+    size_t M = 0;
+    size_t N = 0;
+    archivo >> marca >> M >> N;
+    if(!archivo || marca != "#"){
+        throw std::runtime_error("Formato invalido: falta la primera linea '# M N'");
+    }
+
+    rows_ = M;
+    cols_ = N;
+    data_.assign(M * N, Complex(0.0, 0.0));
+    size_t m = 0;
+    size_t n = 0;
+    double real = 0.0;
+    double imag = 0.0;
+    size_t leidos = 0;
+    while(leidos < M*N){
+        archivo >> m >> n >> real >> imag;
+        if(!archivo || m >= M || n >= N){
+            throw std::runtime_error("Formato invalido: fila o columna fuera de rango");
+        }
+        at(m, n) = Complex(real, imag);
+        leidos++;
     }
 }

@@ -2,6 +2,7 @@
 # include <vector>
 # include <complex>
 # include <cstddef>
+# include <string>
 
 class ComplexField{
 
@@ -79,6 +80,10 @@ class ComplexField{
         void fillSine(size_t k, size_t l);
 
         void fillRandom(unsigned seed);
+
+        void writeDat(const std::string& path) const;
+
+        void readDat(const std::string& path);
 
     private:
         size_t rows_{0};

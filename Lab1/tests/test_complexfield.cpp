@@ -1,6 +1,8 @@
 # include "ComplexField.h"
 # include <cassert>
 # include <iostream>
+# include <cstdio>
+# include <stdexcept>
 
 using Complex = ComplexField::Complex;
 
@@ -124,6 +126,36 @@ int main(){
     }
     assert(iguales);
     assert(distintos);
+
+    // Guarda r1 en un archivo y al leerlo debe quedar exactamente igual
+    r1.writeDat("/tmp/test_complexfield.dat");
+    ComplexField leido;
+    leido.readDat("/tmp/test_complexfield.dat");
+    assert(leido.rows() == 8);
+    assert(leido.cols() == 4);
+    bool identicos = true;
+    m = 0;
+    while(m < 8){
+        size_t n = 0;
+        while(n < 4){
+            if(leido.at(m, n) != r1.at(m, n)){
+                identicos = false;
+            }
+            n++;
+        }
+        m++;
+    }
+    assert(identicos);
+    std::remove("/tmp/test_complexfield.dat");
+
+    // Leer un archivo que no existe debe lanzar error
+    bool lanzo = false;
+    try{
+        leido.readDat("/tmp/no_existe_nunca.dat");
+    }catch(const std::runtime_error&){
+        lanzo = true;
+    }
+    assert(lanzo);
 
     // El impulso tiene un 1 en (0,0) y ceros en el resto
     ComplexField imp(4, 4);
