@@ -1,2 +1,6 @@
 .opencode/
+build/
+*.o
+*.d
 Lab1/build/
+Lab1/fft2d
