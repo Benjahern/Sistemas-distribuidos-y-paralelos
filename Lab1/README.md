@@ -9,7 +9,7 @@
 
 - `include/`: Cabeceras de los módulos del sistema (`.h`).
 - `src/`: Código fuente de las implementaciones (`.cpp`).
-- `tests/`: Suite del rol 3 (`test_fft2d.cpp`), ejecutable con sustitutos o con los módulos reales.
+- `tests/`: Suite del rol 2 (`test_butterfly1d.cpp`) y del rol 3 (`test_fft2d.cpp`), ejecutables con sustitutos o con los módulos reales.
 - `Makefile`: Sistema de compilación modular y ejecución de pruebas.
 - `Dockerfile`: Entorno reproducible para desarrollo y CI (Ubuntu 24.04 con GCC y Make).
 - `AGENTS.md` / `laboratorio_1_openmp_fft_2d.md`: Especificaciones completas del laboratorio.
@@ -26,6 +26,9 @@ make all
 
 # Compilar solo el módulo de FFT 2D
 make Fft2D
+
+# Compilar y ejecutar las pruebas del Rol 2 (Butterfly1D)
+make test-role2
 
 # Validar el rol 3 con sustitutos de los roles 1 y 2
 make test
@@ -129,12 +132,52 @@ son trabajo paralelo en esta implementación.
 
 ---
 
-## 5. Tabla de Roles del Equipo
+## 5. Rol 2: Núcleo Mariposa 1D (`Butterfly1D`)
+
+El Rol 2 implementa el núcleo de la transformada rápida de Fourier unidimensional (FFT e IFFT 1D) radix-2 para arreglos contiguos de tamaño potencia de 2 ($N = 2^p$).
+
+### 5.1. Convención de Escala y Contrato
+- **Transformada directa e inversa 1D sin escalado interno:** La mariposa 1D **no normaliza por $1/N$** en sus pasadas individuales. `inverse = true` únicamente invierte el signo de la fase del factor twiddle ($\omega_m^r = e^{+2\pi i r / m}$).
+- **Ida y Vuelta 1D:** $\text{IFFT}_{1\text{D}}(\text{FFT}_{1\text{D}}(x)) = N \cdot x$. La escala global $\frac{1}{M \cdot N}$ la aplica `Fft2D` al finalizar ambas pasadas ortogonales en 2D.
+
+### 5.2. Layouts y Modos Implementados
+1. `layout = 0`: **Cooley–Tukey (in-place)** con permutación previa *bit-reversal*. Recorre $p = \log_2 N$ etapas modificando el arreglo en memoria compartida sin necesidad de memoria auxiliar extra.
+2. `layout = 1`: **Stockham (out-of-place / autosort)** sin permutación *bit-reversal*. Recorre $p = \log_2 N$ etapas alternando lecturas y escrituras entre dos buffers (`src` y `dst`), entregando el espectro en orden natural.
+
+### 5.3. Suite de Pruebas y Tolerancia Numérica (`test_butterfly1d.cpp`)
+La suite `make test-role2` ejecuta **10 pruebas rigurosas** que validan la matemática y el paralelismo (error absoluto $< 10^{-10}$):
+- *Test 1 (Impulso N=4):* Comprueba respuesta $(1,1,1,1)$ en ambos layouts.
+- *Test 2 (Equivalencia N=8):* Coincidencia exacta entre Cooley-Tukey y Stockham en datos estocásticos.
+- *Test 3 (Contrato sin escala):* Valida que $\text{IFFT}(\text{FFT}(x)) = N \cdot x$ y recuperación de $x$ con $/N$.
+- *Test 4 (Schedules y Chunks):* Invariancia de resultados usando `static`, `dynamic`, `guided`, `collapse` y `transformStages`.
+- *Test 5 (Cláusulas OpenMP):* Comprueba `#pragma omp single`, `firstprivate` y `lastprivate`.
+- *Test 6 (Forma cerrada analítica):* Senoide 1D de 1 período con picos imaginarios puros $\pm 8i$ en $k=1, N-1$.
+- *Test 7 (Escalabilidad de tamaño):* Precisión garantizada en $N=64, 256, 1024$.
+- *Test 8 (Invariancia de hilos):* Resultados idénticos evaluando con 1 vs 8 hilos.
+- *Test 9 (Casos borde):* Manejo robusto de $N=1$ y $N=2$.
+- *Test 10 (Inversa directa 1D):* Reversibilidad directa en ambos layouts.
+
+---
+
+## 6. Mapeo de Cláusulas y Directivas OpenMP (Rol 2)
+
+| Archivo | Función / Método | Cláusula / Directiva OpenMP | Motivo y Justificación Técnica | Test Asociado |
+| :--- | :--- | :--- | :--- | :--- |
+| `src/Butterfly1D.cpp` | `transformCooleyTukey` / `transformStockham` | `#pragma omp parallel for schedule(static/dynamic/guided, chunk)` | Reparto configurable de mariposas disjuntas dentro de cada etapa $s$. | Test 4 (`testSchedulesAndClauses`) |
+| `src/Butterfly1D.cpp` | `transformStages` | `#pragma omp parallel` + `#pragma omp barrier` | Mantiene una sola región paralela con barrera explícita entre etapas para evitar carreras. | Test 4 (`testSchedulesAndClauses`) |
+| `src/Butterfly1D.cpp` | `transformStockham` | `#pragma omp parallel for collapse(2)` | Fusiona los dos bucles anidados independientes de grupos $k$ y elementos $j$ en Stockham. | Test 4 (`testSchedulesAndClauses`) |
+| `src/Butterfly1D.cpp` | `initTwiddlesSingle` | `#pragma omp single` | Permite la inicialización de la tabla de factores twiddle por un único hilo sin interferencia. | Test 5 (`testOpenMPClausesDemo`) |
+| `src/Butterfly1D.cpp` | `accumulateFirstprivate` | `firstprivate(acc)` | Cada hilo recibe una copia privada e inicializada del acumulador base. | Test 5 (`testOpenMPClausesDemo`) |
+| `src/Butterfly1D.cpp` | `stageIndexLastprivate` | `lastprivate(last_stage)` | Preserva el valor del índice de la última etapa evaluada fuera de la región paralela. | Test 5 (`testOpenMPClausesDemo`) |
+
+---
+
+## 7. Tabla de Roles del Equipo
 
 | Rol | Responsable | Módulos Clave | Estado |
 | :--- | :--- | :--- | :--- |
 | **Rol 1: Modelo y Datos** | Integrante Rol 1 | `ComplexField.h/.cpp` | En desarrollo (`feat/Modelos-Datos`) |
-| **Rol 2: Núcleo Mariposa 1D** | Integrante Rol 2 | `Butterfly1D.h/.cpp` | En desarrollo (`feat/Mariposa`) |
+| **Rol 2: Núcleo Mariposa 1D** | Integrante Rol 2 | `Butterfly1D.h/.cpp`, `test_butterfly1d.cpp` | Implementado y Validado (`feat/Mariposa`). Integración pendiente en `dev`.|
 | **Rol 3: FFT e IFFT 2D** | Integrante Rol 3 | `Fft2D.h/.cpp`, `test_fft2d.cpp` | Implementado; validación aislada con sustitutos (`feat/FFT`). Integración pendiente en `dev`. |
 | **Rol 4: Métricas y Benchmarks** | Integrante Rol 4 | `SpectrumMetrics.h/.cpp`, `Benchmark.h/.cpp` | Trabajo en su rama; integración posterior en `dev`. |
 | **Rol 5: Calidad, CI y Visualización** | Integrante Rol 5 | `Visualizer.h/.cpp`, tests globales | Trabajo en su rama; integración posterior en `dev`. |
