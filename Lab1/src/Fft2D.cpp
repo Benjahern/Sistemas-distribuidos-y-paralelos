@@ -12,10 +12,14 @@
 // ============================================================================
 
 bool Fft2D::isPowerOfTwo(std::size_t n) noexcept {
+    // Una potencia de dos tiene un solo bit encendido: 8 = 1000 en binario.
+    // Restar uno y aplicar AND elimina ese bit. El chequeo n != 0 excluye cero.
     return n != 0 && (n & (n - 1)) == 0;
 }
 
 void Fft2D::validateField(const ComplexField& field) const {
+    // M cuenta filas y N columnas. Se validan ambos ejes porque cada uno
+    // será la longitud de una FFT 1D radix-2; no hace falta que M == N.
     const std::size_t M = field.rows();
     const std::size_t N = field.cols();
     if (M == 0 || N == 0) {
@@ -47,14 +51,18 @@ void Fft2D::validateTaskType(int task_type) {
 
 Fft2D::Fft2D(ComplexField& field, int layout)
     : bound_field_(&field), default_layout_(layout) {
+    // Se guarda una referencia mediante un puntero, sin copiar la grilla.
+    // El llamador debe mantener field vivo mientras use esta instancia.
     validateLayout(layout);
 }
 
 // ============================================================================
-// Helpers de transformación atómica (eliminan duplicación de código)
+// Helpers de transformación 1D (reutilizan el núcleo del rol 2)
 // ============================================================================
 
 void Fft2D::transformRow(ComplexField& field, std::size_t r, int layout, bool inverse) {
+    // La memoria es row-major: una fila ocupa N elementos consecutivos.
+    // row_ptr apunta a los datos originales, así que la FFT modifica esa fila.
     std::complex<double>* row_ptr = field.row(r);
     // El núcleo 1D debe devolver la transformada sin normalizar, en ambos signos.
     Butterfly1D butterfly(row_ptr, field.cols(), inverse);
@@ -64,22 +72,32 @@ void Fft2D::transformRow(ComplexField& field, std::size_t r, int layout, bool in
 void Fft2D::rowsPass(ComplexField& field, int layout, bool inverse) {
     const std::size_t M = field.rows();
 
+    // Cada iteración escribe una fila distinta: los hilos no comparten destinos.
+    // default(none) exige declarar el ámbito de los datos; r es privado por ser
+    // el índice del bucle. M, layout e inverse se comparten solo para lectura.
+    // schedule(runtime) toma tipo y chunk de omp_set_schedule u OMP_SCHEDULE.
     #pragma omp parallel for default(none) shared(field, M, layout, inverse) schedule(runtime)
     for (std::size_t r = 0; r < M; ++r) {
         transformRow(field, r, layout, inverse);
     }
+    // El final de la región paralela espera todas las filas antes de retornar.
 }
 
 void Fft2D::colsPass(ComplexField& field, int layout, bool inverse) {
     const std::size_t M = field.rows();
     const std::size_t N = field.cols();
 
-    // Optimización de rendimiento: un único buffer local reservado por hilo (no por columna),
-    // eliminando N asignaciones dinámicas y optimizando la localidad de caché.
+    // Una columna tiene elementos separados por N posiciones en memoria.
+    // El núcleo 1D necesita un arreglo contiguo: copiamos la columna, la
+    // transformamos y devolvemos el resultado a las mismas posiciones.
     #pragma omp parallel default(none) shared(field, M, N, layout, inverse)
     {
+        // Declarado dentro de parallel: cada hilo tiene su propio vector.
+        // Lo reutiliza para sus columnas, evitando reservarlo en cada iteración.
         std::vector<std::complex<double>> col_buf(M);
 
+        // Los hilos pueden tocar las mismas filas, pero columnas distintas:
+        // field.at(r, c) nunca tiene dos escritores en esta pasada.
         #pragma omp for schedule(runtime)
         for (std::size_t c = 0; c < N; ++c) {
             for (std::size_t r = 0; r < M; ++r) {
@@ -101,13 +119,17 @@ void Fft2D::colsPass(ComplexField& field, int layout, bool inverse) {
 // ============================================================================
 
 void Fft2D::forward(ComplexField& field) {
+    // La sobrecarga simple delega para mantener una sola implementación 2D.
     forward(field, default_layout_);
 }
 
 void Fft2D::forward(ComplexField& field, int layout) {
+    // Validar antes de iniciar OpenMP evita lanzar estos errores desde un hilo.
     validateField(field);
     validateLayout(layout);
 
+    // La exponencial de la DFT 2D se separa en un factor por cada eje.
+    // Por eso basta componer M FFT de longitud N con N FFT de longitud M.
     // 1. Pasada por filas (reparte las M transformadas 1D de tamaño N)
     rowsPass(field, layout, /*inverse=*/false);
 
@@ -130,11 +152,15 @@ void Fft2D::inverse(ComplexField& field, int layout) {
     colsPass(field, layout, /*inverse=*/true);
     rowsPass(field, layout, /*inverse=*/true);
 
-    // Factor de escala 1/(M*N) aplicado UNA ÚNICA VEZ al final del proceso completo
+    // Las inversas 1D sin escala dejan un factor N en filas y M en columnas.
+    // Dividir por M*N recupera la entrada. Si el rol 2 ya normalizara las
+    // inversas, esta división sería un segundo escalado: revisar el contrato.
     const size_t M = field.rows();
     const size_t N = field.cols();
     const double scale = 1.0 / (static_cast<double>(M) * static_cast<double>(N));
 
+    // collapse(2) reparte las M*N celdas entre hilos. Es seguro porque cada
+    // celda se multiplica de forma independiente, sin sumar a un acumulador.
     #pragma omp parallel for default(none) shared(field, M, N, scale) collapse(2) schedule(runtime)
     for (size_t r = 0; r < M; ++r) {
         for (size_t c = 0; c < N; ++c) {
@@ -160,6 +186,9 @@ void Fft2D::forwardRows(ComplexField& field, int task_type, bool use_single) {
 }
 
 void Fft2D::forwardRows(ComplexField& field, int task_type, bool use_single, int layout) {
+    // Este método transforma SOLO filas. Para obtener una FFT 2D completa
+    // hay que ejecutar después forwardCols con el mismo layout.
+    // use_single solo cambia cómo se generan tareas en TASK_TYPE_TASK.
     validateField(field);
     validateLayout(layout);
     validateTaskType(task_type);
@@ -177,10 +206,13 @@ void Fft2D::forwardRows(ComplexField& field, int task_type, bool use_single, int
         #pragma omp parallel default(none) shared(field, M, use_single, layout)
         {
             if (use_single) {
-                // Rama con single: un único hilo productor encola las tareas en el pool
+                // single elige un productor; cualquier hilo del equipo puede
+                // ejecutar las tareas. Su barrera implícita espera al equipo.
                 #pragma omp single
                 {
                     for (size_t r = 0; r < M; ++r) {
+                        // Una tarea puede ejecutarse después de avanzar el bucle:
+                        // firstprivate(r) conserva el índice de SU fila.
                         #pragma omp task firstprivate(r) shared(field, layout)
                         {
                             transformRow(field, r, layout, /*inverse=*/false);
@@ -194,6 +226,8 @@ void Fft2D::forwardRows(ComplexField& field, int task_type, bool use_single, int
                 // asegura la finalización de todo el equipo antes de continuar.
                 const int tid = omp_get_thread_num();
                 const int nthreads = omp_get_num_threads();
+                // Reparto cíclico de productores. Con 4 hilos, el hilo 0 genera
+                // filas 0,4,8,... y el hilo 1 filas 1,5,9,...: no hay duplicados.
                 for (size_t r = static_cast<size_t>(tid); r < M; r += static_cast<size_t>(nthreads)) {
                     #pragma omp task firstprivate(r) shared(field, layout)
                     {
@@ -201,24 +235,29 @@ void Fft2D::forwardRows(ComplexField& field, int task_type, bool use_single, int
                     }
                 }
             }
+            // Espera las tareas hijas del hilo actual. La salida de parallel
+            // garantiza además que todas las filas del equipo hayan terminado.
             #pragma omp taskwait
         }
     }
 }
 
 void Fft2D::forwardCols(ComplexField& field, int layout) {
+    // Segunda pasada de una directa separada manualmente en filas y columnas.
     validateField(field);
     validateLayout(layout);
     colsPass(field, layout, /*inverse=*/false);
 }
 
 void Fft2D::inverseRows(ComplexField& field, int layout) {
+    // Pasada inversa parcial sin escala; no equivale a inverse() completa.
     validateField(field);
     validateLayout(layout);
     rowsPass(field, layout, /*inverse=*/true);
 }
 
 void Fft2D::inverseCols(ComplexField& field, int layout) {
+    // Se conserva la escala para que inverse() normalice solo al final.
     validateField(field);
     validateLayout(layout);
     colsPass(field, layout, /*inverse=*/true);
@@ -227,6 +266,10 @@ void Fft2D::inverseCols(ComplexField& field, int layout) {
 // ============================================================================
 // Métodos enlazados (bound_field_)
 // ============================================================================
+
+// Estas sobrecargas usan la grilla recibida en el constructor. Delegan en las
+// mismas rutas anteriores; una instancia creada con Fft2D() no tiene grilla
+// enlazada y debe usar las variantes que reciben ComplexField explícitamente.
 
 void Fft2D::forward() {
     if (!bound_field_) throw std::runtime_error("Fft2D: No bound ComplexField instance.");

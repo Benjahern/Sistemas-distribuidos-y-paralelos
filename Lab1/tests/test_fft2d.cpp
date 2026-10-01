@@ -6,13 +6,16 @@
 #include <vector>
 #include <complex>
 #include <cmath>
+// Los asserts deben ejecutarse incluso si el compilador recibe -DNDEBUG.
+// Si una condición falla, la suite termina con error en lugar de anunciar éxito.
 #undef NDEBUG
 #include <cassert>
 #include <random>
 #include <utility>
 #include <omp.h>
 
-// Tolerancia estándar declarada en el README y justificada según IEEE 754
+// std::abs(error_complejo) mide la distancia entre dos valores complejos.
+// Se permite un error pequeño de redondeo, en vez de exigir igualdad exacta.
 constexpr double TOLERANCE = 1e-10;
 
 // ============================================================================
@@ -22,6 +25,8 @@ constexpr double TOLERANCE = 1e-10;
 // ============================================================================
 #ifdef FFT2D_STANDALONE_STUBS
 
+// Modelo mínimo para las pruebas: un vector de rows*cols valores complejos.
+// No incluye generación ni entrada/salida de datos propias del rol 1.
 ComplexField::ComplexField(size_t rows, size_t cols)
     : rows_(rows), cols_(cols), data_(rows * cols, std::complex<double>(0.0, 0.0)) {}
 
@@ -38,6 +43,7 @@ void Butterfly1D::setData(std::complex<double>* data, size_t n, bool inverse) {
 }
 
 static size_t bitReverse(size_t i, size_t log2n) {
+    // Invierte log2n bits: con N=8, el índice 3 (011) pasa a 6 (110).
     size_t rev = 0;
     for (size_t bit = 0; bit < log2n; ++bit) {
         if ((i >> bit) & 1) {
@@ -54,18 +60,22 @@ void Butterfly1D::transformCollapse() { transform(0, 0, 0); }
 void Butterfly1D::transformStages() { transform(0, 0, 0); }
 
 void Butterfly1D::transform(int layout, int schedule_type, int chunk_size) {
+    // Este sustituto es serial: ignora schedule y chunk. Las pruebas OpenMP
+    // validan el reparto 2D de Fft2D, no las barreras internas del rol 2.
     (void)schedule_type;
     (void)chunk_size;
     if (n_ <= 1 || !data_) return;
 
     const double pi = 3.14159265358979323846;
+    // Cambiar el signo da la inversa sin escala requerida por Fft2D.
     const double sign = inverse_ ? 1.0 : -1.0;
 
     size_t p = 0;
     while ((size_t(1) << p) < n_) ++p;
 
     if (layout == 0) {
-        // Cooley-Tukey (in-place)
+        // Cooley-Tukey: reordena la entrada y combina grupos de 2,4,8,...
+        // La condición i < rev evita intercambiar dos veces la misma pareja.
         for (size_t i = 0; i < n_; ++i) {
             size_t rev = bitReverse(i, p);
             if (i < rev) {
@@ -79,6 +89,8 @@ void Butterfly1D::transform(int layout, int schedule_type, int chunk_size) {
             for (size_t k = 0; k < n_; k += m) {
                 std::complex<double> w(1.0, 0.0);
                 for (size_t j = 0; j < m2; ++j) {
+                    // Se leen ambos valores antes de sobrescribir la pareja.
+                    // w avanza por las potencias del twiddle de esta etapa.
                     std::complex<double> u = data_[k + j];
                     std::complex<double> v = w * data_[k + j + m2];
                     data_[k + j] = u + v;
@@ -88,7 +100,8 @@ void Butterfly1D::transform(int layout, int schedule_type, int chunk_size) {
             }
         }
     } else {
-        // Stockham (out-of-place)
+        // Stockham: cada etapa lee src y escribe dst con otro orden de índices.
+        // Así incorpora el reordenamiento sin una permutación bit-reversal.
         std::vector<std::complex<double>> src(data_, data_ + n_);
         std::vector<std::complex<double>> dst(n_);
         for (size_t s = 0; s < p; ++s) {
@@ -107,6 +120,8 @@ void Butterfly1D::transform(int layout, int schedule_type, int chunk_size) {
                     dst[o1] = u - v;
                 }
             }
+            // La salida de la etapa se convierte en entrada de la siguiente.
+            // Este sustituto termina todo el bucle antes de intercambiar buffers.
             src.swap(dst);
         }
         for (size_t i = 0; i < n_; ++i) {
@@ -123,6 +138,9 @@ void Butterfly1D::transform(int layout, int schedule_type, int chunk_size) {
 // ============================================================================
 
 ComplexField naiveDft2D(const ComplexField& x) {
+    // Calcula cada frecuencia (k,l) sumando TODAS las muestras (m,n).
+    // Es lenta, pero independiente de la FFT: detecta errores que una ida y
+    // vuelta podría ocultar si directa e inversa compartieran el mismo defecto.
     const size_t M = x.rows();
     const size_t N = x.cols();
     const double pi = 3.14159265358979323846;
@@ -172,6 +190,8 @@ void testImpulse2x2(int layout) {
 }
 
 void testCompareAgainstNaiveDft() {
+    // Probar ambos órdenes rectangulares descubre si se confunden M y N
+    // al seleccionar la longitud de las filas o reservar el buffer de columnas.
     std::cout << "[Test 2] Comparación contra DFT 2D ingenua (Ec. 1) en 8x4 Y 4x8... ";
     const std::vector<std::pair<size_t, size_t>> dimensions = {{8, 4}, {4, 8}};
     Fft2D fft;
@@ -281,6 +301,8 @@ void testSineWavePeakAndMagnitude(int layout) {
 }
 
 void testParseval(int layout) {
+    // La semilla fija hace reproducible el campo aleatorio. Parseval comprueba
+    // la escala de la directa sin depender de la implementación de la inversa.
     std::cout << "[Test 5] Teorema de Parseval en grilla 8x8 con semilla fija... ";
     const size_t M = 8;
     const size_t N = 8;
@@ -314,6 +336,8 @@ void testParseval(int layout) {
 }
 
 void testRoundtripExhaustive() {
+    // Cada combinación parte de una COPIA de la misma entrada original.
+    // Así se comparan layouts e hilos sin transformar un resultado anterior.
     std::cout << "[Test 6] Ida y vuelta exhaustiva (dimensiones, layouts e hilos)... ";
     const std::vector<std::pair<size_t, size_t>> test_dims = {{8, 4}, {4, 8}, {2, 2}, {16, 16}};
     const int layouts[] = {Fft2D::LAYOUT_INPLACE, Fft2D::LAYOUT_STOCKHAM};
@@ -356,6 +380,8 @@ void testRoundtripExhaustive() {
 }
 
 void testBoundInstance() {
+    // Comprueba la segunda forma de uso: enlazar el campo al construir permite
+    // llamar forward()/inverse() sin volver a pasar la grilla como argumento.
     std::cout << "[Test 7] Instancia enlazada Fft2D(field) en 4x8 y 8x4 con ambos layouts... ";
     const std::vector<std::pair<size_t, size_t>> dims = {{4, 8}, {8, 4}};
     const int layouts[] = {Fft2D::LAYOUT_INPLACE, Fft2D::LAYOUT_STOCKHAM};
@@ -386,6 +412,8 @@ void testBoundInstance() {
 }
 
 void testOpenMpTaskVsParallelFor() {
+    // Se comparan solo las filas para aislar el mecanismo de reparto.
+    // Las tres rutas deben producir el mismo resultado desde la misma entrada.
     std::cout << "[Test 8] Comparación OpenMP parallel for vs task (con y sin single)... ";
     const size_t M = 16;
     const size_t N = 8;
@@ -430,6 +458,8 @@ void testOpenMpTaskVsParallelFor() {
 }
 
 void testScheduleSweep() {
+    // omp_set_schedule configura los bucles schedule(runtime) de Fft2D.
+    // Esta prueba comprueba corrección con cada reparto, no mide rendimiento.
     std::cout << "[Test 9] Barrido de OpenMP schedule(runtime) (static, dynamic, guided)... ";
     const size_t M = 8;
     const size_t N = 8;
@@ -471,6 +501,8 @@ void testScheduleSweep() {
 }
 
 void testThreadScalabilityBothPasses() {
+    // Comparar también los espectros evita depender únicamente de la ida y
+    // vuelta. La referencia usa el mismo código con un hilo, como pide el lab.
     std::cout << "[Test 10] Invariancia numérica en directa E inversa con ambos layouts (1 vs 2, 4, 8 hilos)... ";
     const size_t M = 16;
     const size_t N = 16;
@@ -514,6 +546,8 @@ void testThreadScalabilityBothPasses() {
 }
 
 void testExceptionHandling() {
+    // Una entrada inválida debe rechazarse antes de comenzar a transformarla.
+    // La lambda permite comprobar distintas llamadas con la misma condición.
     std::cout << "[Test 11] Robustez y manejo de excepciones (incluyendo pasadas individuales)... ";
     Fft2D fft;
 
@@ -590,8 +624,12 @@ void testPartialPassesAndDegenerateDimensions() {
                 }
             }
 
+            // Sin normalización, deshacer ambos ejes produce M*N*original.
+            // Esta condición detectará una IFFT 1D ya escalada durante el merge.
             fft.inverseCols(partial, layout);
             fft.inverseRows(partial, layout);
+            // inverse() completa sí debe recuperar original desde el espectro
+            // de referencia, independientemente de las pasadas parciales.
             ComplexField complete = reference;
             fft.inverse(complete, layout);
             double squared_error = 0.0;
@@ -603,6 +641,8 @@ void testPartialPassesAndDegenerateDimensions() {
                     squared_error += std::norm(error);
                 }
             }
+            // RMSE = raíz del promedio de |recuperado - original|^2.
+            // Aquí factor es también la cantidad de muestras de la grilla.
             assert(std::sqrt(squared_error / factor) < TOLERANCE);
         }
     }

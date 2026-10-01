@@ -18,7 +18,6 @@ public:
 
     void setData(std::complex<double>* data, size_t n, bool inverse = false);
 
-    // Métodos obligatorios requeridos por AGENTS.md
     void transform();
     void transform(int schedule_type);
     void transform(int schedule_type, int chunk_size);
