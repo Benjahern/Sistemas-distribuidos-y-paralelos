@@ -48,3 +48,36 @@ void ComplexField::bitReversePermute(Complex* arr, int n){
         i++;
     }
 }
+
+
+void ComplexField::getRow(int m,Complex* row) const{
+    int n = 0;
+    while(n < dimN){
+        row[n] = at(m,n);
+        n++;
+    }
+}
+
+void ComplexField::setRow(int m, const Complex* row){
+    int n = 0;
+    while(n < dimN){
+        at(m,n) =row[n];
+        n++;
+    }
+}
+
+void ComplexField::getCol(int n,Complex* col) const{
+    int m = 0;
+    while(m < dimM){
+        col[m] = at(m,n);
+        m++;
+    }
+}
+
+void ComplexField::setCol(int n, const Complex* col){
+    int m = 0;
+    while(m < dimM){
+        at(m,n) = col[m];
+        m++;
+    }
+}
