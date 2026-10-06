@@ -1,0 +1,31 @@
+name: Docker - Lab1
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "Lab1/**"
+      - ".github/workflows/docker.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "Lab1/**"
+      - ".github/workflows/docker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    name: Build and run Lab1 container
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build --tag lab1-fft2d:ci --file Lab1/Dockerfile Lab1
+
+      - name: Run container build check
+        run: docker run --rm lab1-fft2d:ci
