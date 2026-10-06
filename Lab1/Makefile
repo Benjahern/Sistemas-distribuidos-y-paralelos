@@ -15,7 +15,7 @@ TESTS     := $(sort $(wildcard tests/*.cpp))
 TEST_OBJS := $(patsubst tests/%.cpp,$(BUILD_DIR)/tests/%.o,$(TESTS))
 
 .DEFAULT_GOAL := all
-.PHONY: all clean test test-role3 test-integration $(MODULES)
+.PHONY: all clean test test-role2 test-role3 test-integration $(MODULES)
 
 # make: compila todos los .cpp disponibles como unidades independientes.
 all: $(OBJECTS)
@@ -27,9 +27,13 @@ $(BUILD_DIR)/%.o: src/%.cpp
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(OPENMP) -MMD -MP -c $< -o $@
 
-# En esta rama, test valida el rol 3 con sustitutos de los roles 1 y 2.
-# Después del merge, test-integration enlaza las implementaciones reales.
-test: test-role3
+test: test-role2 test-role3
+
+test-role2: $(BUILD_DIR)/test_butterfly1d
+	$(abspath $(BUILD_DIR)/test_butterfly1d)
+
+$(BUILD_DIR)/test_butterfly1d: $(BUILD_DIR)/tests/test_butterfly1d.o $(BUILD_DIR)/Butterfly1D.o
+	$(CXX) $(CXXFLAGS) $(OPENMP) $^ -o $@
 
 test-role3: $(BUILD_DIR)/test_fft2d
 	$(abspath $(BUILD_DIR)/test_fft2d)
@@ -51,7 +55,7 @@ $(BUILD_DIR)/tests/%.o: tests/%.cpp
 	@mkdir -p $(BUILD_DIR)/tests
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(OPENMP) -MMD -MP -c $< -o $@
 
-# Elimina los archhivos de la carpeta generada build
+# Elimina los archivos de la carpeta generada build
 clean:
 	rm -rf $(BUILD_DIR)
 
