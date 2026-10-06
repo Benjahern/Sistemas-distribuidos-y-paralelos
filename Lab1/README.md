@@ -1,183 +1,264 @@
-# Laboratorio 1 - Programación Paralela con OpenMP: FFT e IFFT 2D
+# Laboratorio 1 — FFT e IFFT 2D con OpenMP
 
-**Departamento de Ingeniería Informática**
-**Universidad de Santiago de Chile**
+C++17, doble precisión, radix-2 y grillas complejas `M × N` con ambos ejes
+potencias de dos, incluso rectangulares. No se usan bibliotecas externas de FFT.
+Los layouts Cooley–Tukey in-place y Stockham producen el mismo espectro en orden natural.
 
----
+## Compilación y pruebas
 
-## 1. Estructura del Proyecto
-
-- `include/`: Cabeceras de los módulos del sistema (`.h`).
-- `src/`: Código fuente de las implementaciones (`.cpp`).
-- `tests/`: Suite del rol 2 (`test_butterfly1d.cpp`) y del rol 3 (`test_fft2d.cpp`), ejecutables con sustitutos o con los módulos reales.
-- `Makefile`: Sistema de compilación modular y ejecución de pruebas.
-- `Dockerfile`: Entorno reproducible para desarrollo y CI (Ubuntu 24.04 con GCC y Make).
-- `AGENTS.md` / `laboratorio_1_openmp_fft_2d.md`: Especificaciones completas del laboratorio.
-
----
-
-## 2. Compilación y Ejecución
-
-El proyecto utiliza C++17 y OpenMP. La compilación se gestiona de forma modular para permitir que cada rol compile independientemente:
+Dependencias: GCC con OpenMP, Make y Python 3 con NumPy/Matplotlib (solo gráficos y
+pruebas de las salidas). En Ubuntu/Debian:
 
 ```bash
-# Compilar todos los módulos disponibles como objetos (.o)
-make all
-
-# Compilar solo el módulo de FFT 2D
-make Fft2D
-
-# Compilar y ejecutar las pruebas del Rol 2 (Butterfly1D)
-make test-role2
-
-# Validar el rol 3 con sustitutos de los roles 1 y 2
+sudo apt-get install build-essential python3-numpy python3-matplotlib
+make
 make test
-
-# Después del merge en dev: validar con los módulos reales
-make test-integration
-
-# Limpiar archivos binarios generados
-make clean
+make demo
+./build/fft2d --help
 ```
 
-`make test` es un alias de `make test-role3`. Define `FFT2D_STANDALONE_STUBS`
-únicamente para el objeto de pruebas aisladas. `make test-integration` compila
-otro objeto sin esa macro y enlaza `ComplexField.cpp` y `Butterfly1D.cpp`.
-Ambos comandos usan la misma suite y mantienen sus binarios separados para
-evitar reutilizar sustitutos al probar la integración.
+`make all` enlaza `build/fft2d`; siguen disponibles los targets por módulo, por
+ejemplo `make Butterfly1D`. Compila con `-std=c++17 -Wall -Wextra -Wpedantic -O2 -fopenmp`.
+`make clean` elimina únicamente el directorio configurado con `BUILD_DIR`.
+**No elimina `results/` ni la carpeta `OUTPUT`.** Las dependencias se instalan
+manualmente. `make -j4` es opcional: compila hasta cuatro archivos simultáneamente,
+sin configurar los hilos de la FFT.
 
-En esta rama, los `.cpp` de los roles 1 y 2 están vacíos: la integración se
-ejecutará después de incorporar sus ramas en `dev`. Esto no impide validar
-la composición 2D del rol 3 de forma aislada. `make all` compila objetos;
-el ejecutable de la aplicación queda a cargo de la integración del equipo.
-
-### Ejecución en Contenedor Docker
+### Todo el flujo con Make
 
 ```bash
-# Construir la imagen del laboratorio
-docker build -t lab1-dev -f Dockerfile .
+# Compilar, probar, demostrar, medir y generar las seis salidas:
+make pipeline
 
-# Ejecutar las pruebas dentro del contenedor
-docker run --rm -v "${PWD}:/app" -w /app lab1-dev make test
+# Campaña corta en otra carpeta, conservando resultados anteriores:
+make pipeline OUTPUT=results/quick \
+  BENCHMARK_ARGS="--min-size 128 --max-size 256 --chunk-grid 128 --threads 1,2,4"
 ```
 
----
+`pipeline` ejecuta **compilación → pruebas → demo → benchmark → gráficos**.
+Los pasos son secuenciales incluso con `make -j4`; solo la compilación y las suites
+que componen `test` pueden aprovechar Make en paralelo. El benchmark empieza
+cuando todas las pruebas y la demo han terminado. No lanzar simultáneamente
+otros targets o procesos de carga durante las mediciones.
 
-## 3. Rol 3: FFT e IFFT Bidimensional (`Fft2D`)
+| Target | Acción |
+|---|---|
+| `make` / `make all` | Solo compilar la aplicación |
+| `make test` | Compilar y ejecutar la suite completa |
+| `make demo` | FFT/IFFT aleatoria, Parseval por tres métodos y espectro de seno |
+| `make benchmark` | Medir ambos layouts y producir las cuatro tablas `.dat` |
+| `make plots` | Leer datos existentes y generar los PNG, sin repetir mediciones |
+| `make pipeline` | Compilar, probar, ejecutar demo, medir y generar gráficos en orden |
+| `make clean` | Limpiar objetos/binarios, sin borrar resultados |
 
-El Rol 3 implementa la transformada de Fourier bidimensional directa e inversa basada en el principio de **separabilidad matemática** sobre grillas de tamaño $M \times N$ (ambas potencias de 2, permitiendo $M \neq N$).
+`make all` sigue siendo rápido: no inicia benchmarks, Docker ni gráficos.
+`pipeline` es el flujo **local**; Docker es opcional y no se ejecuta automáticamente.
+No genera el reporte PDF ni sustituye el análisis de resultados.
 
-### 3.1. Convención de Escala
-- **Transformada directa (`forward`):** Se evalúa sin factor de escala:
-  $$X_{k,l} = \sum_{m=0}^{M-1} \sum_{n=0}^{N-1} x_{m,n} e^{-2\pi i \left(\frac{km}{M} + \frac{ln}{N}\right)}$$
-- **Transformada inversa (`inverse`):** Utiliza twiddles con signo conjugado ($+2\pi i$) y aplica el factor de escala total $\frac{1}{M \cdot N}$ **una única vez** al final del proceso completo (después de invertir columnas y filas):
-  $$x_{m,n} = \frac{1}{MN} \sum_{k=0}^{M-1} \sum_{l=0}^{N-1} X_{k,l} e^{+2\pi i \left(\frac{km}{M} + \frac{ln}{N}\right)}$$
+`OUTPUT=carpeta` selecciona dónde guardar datos y figuras (por defecto `results`).
+`BENCHMARK_ARGS="opciones"` pasa opciones directamente al benchmark, sin duplicar
+la configuración del CLI en el Makefile. Para personalizar demo, espectro o escala
+de los gráficos, usar directamente el ejecutable o el script, como se muestra abajo.
 
-**Contrato requerido para integrar el rol 2:** `Butterfly1D(data, n, inverse)`
-y `transform(layout, 0, 0)` deben producir una transformada 1D sin escala.
-`inverse=true` cambia únicamente el signo del exponente. Por tanto,
-`inverseRows` e `inverseCols` tampoco normalizan; solo `Fft2D::inverse` aplica
-el factor final. Una IFFT 1D utilizada por separado requiere su factor `1/n`.
-Si la interfaz del rol 2 normaliza internamente, habrá que adaptar este contrato
-durante el merge para evitar un segundo escalado. El test 12 detecta esa diferencia.
+`make test` ejecuta pruebas 1D, composición 2D con sustitutos **y con los módulos
+reales**, modelo de datos, métricas, estadísticas, Amdahl, CLI y generación de PNG.
+`make test-role3` mantiene la suite aislada; `make test-integration` usa el núcleo real.
+`TEST_THREADS=4` controla el equipo inicial de las suites antiguas; estas también
+prueban explícitamente 1, 2, 4 y 8 hilos.
 
-Los sustitutos de la suite implementan este contrato. Son apoyo de pruebas,
-no la implementación entregable del núcleo del rol 2. Las cabeceras de
-`ComplexField` y `Butterfly1D` representan las interfaces requeridas por esta rama;
-se deben contrastar con las definitivas del equipo al integrar en `dev`.
+Cobertura: bit-reversal `N=8`, impulso y seno con forma cerrada e inversa para
+`N=4,8,16`, impulso `2×2`, DFT de referencia `8×4`/`4×8`, seno 2D, Parseval,
+semilla fija, layouts, schedules, tareas con/sin `single`, barreras en `N=4096`,
+grilla `64×32` e invariancia ante hilos. Los tests verifican el contenido y nombres
+de las tablas, las fórmulas estadísticas y las firmas PNG: no son targets vacíos.
 
-### 3.2. Justificación de Tolerancia Numérica
-- Se utiliza doble precisión (`double`, $\epsilon \approx 2.22 \times 10^{-16}$). La FFT acumula redondeo a lo largo de sus etapas; la magnitud de la entrada y el cálculo de twiddles también influyen.
-- La suite exige **error absoluto por elemento menor que $10^{-10}$**. Esto también acota el RMSE por debajo de ese valor; el test 12 lo calcula explícitamente. Es una tolerancia conservadora para las entradas y tamaños pequeños de esta suite, no una garantía para cualquier amplitud o tamaño de benchmark.
-- Las 12 pruebas cubren DFT de referencia en `8x4` y `4x8`, impulso `2x2`, exponencial compleja, seno 2D y Parseval en ambos layouts, ida y vuelta con 1, 2, 4 y 8 hilos, tareas con y sin `single`, schedules, validaciones y pasadas individuales. Los tamaños grandes se validarán al integrar los benchmarks.
+## Convención matemática y métricas
 
-### 3.3. Modos y Layouts Soportados
-La clase `Fft2D` propaga el layout de mariposa a las pasadas 1D:
-- `layout = 0`: **In-place (Cooley–Tukey)** con permutación bit-reversal previa.
-- `layout = 1`: **Stockham (out-of-place)** con alternancia de buffers y salida en orden natural.
+La directa usa `exp(-2πi(km/M+ln/N))` **sin escala**. La inversa usa signo positivo,
+deshace columnas y filas y aplica **una sola vez** `1/(M*N)` al final. `Butterfly1D`
+mantiene su contrato previo sin normalización en ambos signos: para usar una
+IFFT 1D aislada, el llamador divide por su longitud. Las pruebas hacen esa división.
 
-Ambos modos producen exactamente la misma transformada dentro de la tolerancia numérica.
+`SpectrumMetrics(original, other)` compara `other` con la entrada:
 
----
+- `roundtripError()`: `other` debe ser la reconstrucción;
+  `RMSE = sqrt(sum(norm(original-other))/(M*N))`.
+- `parseval(method[, use_private])`: `other` debe ser el espectro;
+  `Ex=sum(norm(x))`, `EX=sum(norm(X))/(M*N)`. Devuelve ambas energías y error
+  absoluto y relativo; para energía de entrada cero reporta la diferencia absoluta.
+- `method=0`: reduction, `1`: atomic, `2`: critical. Con `use_private=true` se usa
+  una variable scratch explícitamente privada; con `false`, la expresión directa.
 
-### 3.4. Orden de las Pasadas y Conmutatividad
-- **Directa:** Pasada por filas (longitud $N$) $\to$ Sincronización $\to$ Pasada por columnas (longitud $M$).
-- **Inversa:** Pasada por columnas $\to$ Sincronización $\to$ Pasada por filas $\to$ Escalado $\frac{1}{M \cdot N}$.
-- *Justificación matemática:* La DFT 2D es un producto tensorial separable y lineal. Las transformadas 1D en dimensiones ortogonales conmutan ($F_{2D} = F_{cols} \circ F_{rows} = F_{rows} \circ F_{cols}$), por lo que deshacer en orden inverso (columnas y luego filas) o en orden directo con twiddles conjugados recupera exactamente la señal original.
+Se exige RMSE absoluto `<=1e-10` y discrepancia relativa de Parseval `<=1e-10` en
+los benchmarks. Es una cota conservadora para datos uniformes en `[-1,1]` de doble
+precisión: la FFT acumula redondeo en `O(log M + log N)` etapas. No constituye una
+garantía para amplitudes arbitrarias. Se valida **cada configuración medida** y se
+aborta ante resultados no finitos o fuera de tolerancia.
 
-### 3.5. Costes para el Análisis de Rendimiento
-El rol 4 podrá medir estos costes de la composición 2D:
-1. **Acceso no contiguo de columnas:** Las copias hacia y desde `col_buf` están repartidas entre hilos, pero el stride puede limitar la localidad y el ancho de banda de memoria.
-2. **Creación y sincronización de tareas OpenMP:** Con `single`, un hilo genera las tareas; `taskwait` espera las hijas del hilo que lo ejecuta y el final de la región paralela garantiza que todo el equipo termine antes de continuar.
-3. **Pasada de normalización:** Es un recorrido adicional paralelo con `collapse(2)` y también consume ancho de banda de memoria.
+## Benchmarks reproducibles
 
-Estos costes no equivalen automáticamente a la fracción serial $f$ de Amdahl.
-Su estimación requiere mediciones; en particular, columnas y normalización
-son trabajo paralelo en esta implementación.
+```bash
+# Campaña acotada, ambos layouts, al menos diez repeticiones por punto:
+OMP_PROC_BIND=close OMP_PLACES=cores make benchmark \
+  BENCHMARK_ARGS="--min-size 128 --max-size 1024 --chunk-grid 256 --threads 1,2,4,8 --repetitions 10 --seed 42"
+make plots
 
----
+# Ampliar incluyendo los procesadores lógicos disponibles (Linux):
+OMP_PROC_BIND=close OMP_PLACES=cores make benchmark OUTPUT=results/full \
+  BENCHMARK_ARGS="--min-size 128 --max-size 4096 --chunk-grid 256 --threads 1,2,4,8,$(nproc) --memory-mib 512"
 
-## 4. Mapeo de Cláusulas y Directivas OpenMP (Rol 3)
+# Regenerar figuras sin medir de nuevo:
+make plots OUTPUT=results/full
+```
 
-| Archivo | Función / Método | Cláusula / Directiva OpenMP | Motivo y Justificación Técnica | Test Asociado |
-| :--- | :--- | :--- | :--- | :--- |
-| `src/Fft2D.cpp` | `rowsPass` / `colsPass` | `parallel for` / `parallel` + `for`, con `schedule(runtime)` | Reparto static, dynamic o guided configurable con `omp_set_schedule`, incluido el chunk. | Test 9 (`testScheduleSweep`) |
-| `src/Fft2D.cpp` | `forwardRows` | `#pragma omp task` | Empaqueta el procesamiento de cada fila individual como una tarea asíncrona en el pool de OpenMP. | Test 8 (`testOpenMpTaskVsParallelFor`) |
-| `src/Fft2D.cpp` | `forwardRows` | `#pragma omp single` | Permite que un único hilo productor genere y encole las tareas de filas mientras el resto del equipo las consume. | Test 8 (`testOpenMpTaskVsParallelFor`) |
-| `src/Fft2D.cpp` | `forwardRows` | `#pragma omp taskwait` | Espera las tareas hijas del hilo que lo ejecuta. El final de la región paralela garantiza la finalización de todas las filas. | Test 8 (`testOpenMpTaskVsParallelFor`) |
-| `src/Fft2D.cpp` | `forwardRows` | `firstprivate(r)` | Cada tarea recibe una copia privada e inmutable de su índice de fila $r$. | Test 8 (`testOpenMpTaskVsParallelFor`) |
-| `src/Fft2D.cpp` | `colsPass` | `#pragma omp parallel` + buffer local | Se reserva un único buffer `col_buf(M)` por hilo dentro de la región paralela, eliminando $N$ asignaciones dinámicas y optimizando la caché. | Test 2, 6, 10 |
-| `src/Fft2D.cpp` | `inverse` | `#pragma omp parallel for collapse(2)` | Colapsa los dos bucles anidados independientes ($M \times N$) para normalizar la matriz por el factor de escala $\frac{1}{M \cdot N}$ en paralelo. | Test 1, 6, 7, 10 |
-| `src/Fft2D.cpp` | Todas | `default(none)`, `shared(...)` | Control estricto de ámbito de variables para evitar condiciones de carrera y garantizar transparencia en OpenMP. | Todos los tests |
+`make benchmark` mide y escribe datos; `make plots` añade los PNG.
+Usa tamaños desde 128 hasta 1024 por defecto; sin `--threads`,
+agrega `omp_get_num_procs()` a `1,2,4,8`, sin duplicados. Siempre incluye un hilo.
+El barrido de chunks usa `--chunk-grid` (256 por defecto), chunks `1,2,4,8,16,32,64`,
+ambos layouts y los schedules static/dynamic/guided. Mide un hilo y el mayor equipo
+solicitado; `--chunks 1,4,16` permite cambiar el barrido.
 
----
+Se mide **solo la FFT 2D directa completa** con `omp_get_wtime()`: incluye buffers,
+bit-reversal, cálculo de twiddles, copias de columnas y sincronización necesarios
+para la llamada. Generación de entrada, restauración antes de cada repetición,
+calentamiento, IFFT, métricas y escritura quedan fuera del cronómetro. No se
+transforma repetidamente el espectro anterior. Los equipos se fijan con
+`omp_set_dynamic(0)`; se registra el número real de hilos y se aborta si difiere
+del solicitado. La configuración OpenMP del llamador se restaura al finalizar.
 
-## 5. Rol 2: Núcleo Mariposa 1D (`Butterfly1D`)
+`T = promedio ± desviación estándar muestral` (denominador `R-1`, Welford).
+El tiempo de referencia `T1` usa **el mismo binario, entrada, tamaño, layout,
+schedule y chunk**, no otra implementación serial:
 
-El Rol 2 implementa el núcleo de la transformada rápida de Fourier unidimensional (FFT e IFFT 1D) radix-2 para arreglos contiguos de tamaño potencia de 2 ($N = 2^p$).
+```text
+Sp = mean(T1)/mean(Tp)
+Ep = Sp/p
+sigma_Sp = Sp * sqrt((sigma_T1/mean_T1)^2 + (sigma_Tp/mean_Tp)^2)
+sigma_Ep = sigma_Sp/p
+```
 
-### 5.1. Convención de Escala y Contrato
-- **Transformada directa e inversa 1D sin escalado interno:** La mariposa 1D **no normaliza por $1/N$** en sus pasadas individuales. `inverse = true` únicamente invierte el signo de la fase del factor twiddle ($\omega_m^r = e^{+2\pi i r / m}$).
-- **Ida y Vuelta 1D:** $\text{IFFT}_{1\text{D}}(\text{FFT}_{1\text{D}}(x)) = N \cdot x$. La escala global $\frac{1}{M \cdot N}$ la aplica `Fft2D` al finalizar ambas pasadas ortogonales en 2D.
+Son desviaciones estándar de tiempos y su propagación solicitada, **no** errores
+estándar de la media ni intervalos de confianza. Para `p=1`, `T1/T1` es exactamente
+uno y su incertidumbre cero; no son dos variables independientes. Las demás
+propagaciones suponen independencia entre las mediciones de referencia y paralela.
 
-### 5.2. Layouts y Modos Implementados
-1. `layout = 0`: **Cooley–Tukey (in-place)** con permutación previa *bit-reversal*. Recorre $p = \log_2 N$ etapas modificando el arreglo en memoria compartida sin necesidad de memoria auxiliar extra.
-2. `layout = 1`: **Stockham (out-of-place / autosort)** sin permutación *bit-reversal*. Recorre $p = \log_2 N$ etapas alternando lecturas y escrituras entre dos buffers (`src` y `dst`), entregando el espectro en orden natural.
+### Amdahl y límites
 
-### 5.3. Suite de Pruebas y Tolerancia Numérica (`test_butterfly1d.cpp`)
-La suite `make test-role2` ejecuta **10 pruebas rigurosas** que validan la matemática y el paralelismo (error absoluto $< 10^{-10}$):
-- *Test 1 (Impulso N=4):* Comprueba respuesta $(1,1,1,1)$ en ambos layouts.
-- *Test 2 (Equivalencia N=8):* Coincidencia exacta entre Cooley-Tukey y Stockham en datos estocásticos.
-- *Test 3 (Contrato sin escala):* Valida que $\text{IFFT}(\text{FFT}(x)) = N \cdot x$ y recuperación de $x$ con $/N$.
-- *Test 4 (Schedules y Chunks):* Invariancia de resultados usando `static`, `dynamic`, `guided`, `collapse` y `transformStages`.
-- *Test 5 (Cláusulas OpenMP):* Comprueba `#pragma omp single`, `firstprivate` y `lastprivate`.
-- *Test 6 (Forma cerrada analítica):* Senoide 1D de 1 período con picos imaginarios puros $\pm 8i$ en $k=1, N-1$.
-- *Test 7 (Escalabilidad de tamaño):* Precisión garantizada en $N=64, 256, 1024$.
-- *Test 8 (Invariancia de hilos):* Resultados idénticos evaluando con 1 vs 8 hilos.
-- *Test 9 (Casos borde):* Manejo robusto de $N=1$ y $N=2$.
-- *Test 10 (Inversa directa 1D):* Reversibilidad directa en ambos layouts.
+Por cada tamaño/layout/schedule/chunk se ajusta por mínimos cuadrados ordinarios:
 
----
+```text
+Tp/T1 = 1/p + f*(1-1/p)
+Sp_Amdahl = 1/(f+(1-f)/p)
+```
 
-## 6. Mapeo de Cláusulas y Directivas OpenMP (Rol 2)
+`f` se acota a `[0,1]`; la tabla indica `fit_clamped` y el residual
+`Sp_medido-Sp_Amdahl`. Si solo se midió un hilo, `f` y la predicción son `nan`
+(no identificables). Las líneas son **un ajuste de las mismas mediciones**, no una
+predicción independiente. Con un solo punto paralelo, el ajuste tampoco permite
+validar capacidad predictiva. No se estima ni propaga incertidumbre de `f`.
 
-| Archivo | Función / Método | Cláusula / Directiva OpenMP | Motivo y Justificación Técnica | Test Asociado |
-| :--- | :--- | :--- | :--- | :--- |
-| `src/Butterfly1D.cpp` | `transformCooleyTukey` / `transformStockham` | `#pragma omp parallel for schedule(static/dynamic/guided, chunk)` | Reparto configurable de mariposas disjuntas dentro de cada etapa $s$. | Test 4 (`testSchedulesAndClauses`) |
-| `src/Butterfly1D.cpp` | `transformStages` | `#pragma omp parallel` + `#pragma omp barrier` | Mantiene una sola región paralela con barrera explícita entre etapas para evitar carreras. | Test 4 (`testSchedulesAndClauses`) |
-| `src/Butterfly1D.cpp` | `transformStockham` | `#pragma omp parallel for collapse(2)` | Fusiona los dos bucles anidados independientes de grupos $k$ y elementos $j$ en Stockham. | Test 4 (`testSchedulesAndClauses`) |
-| `src/Butterfly1D.cpp` | `initTwiddlesSingle` | `#pragma omp single` | Permite la inicialización de la tabla de factores twiddle por un único hilo sin interferencia. | Test 5 (`testOpenMPClausesDemo`) |
-| `src/Butterfly1D.cpp` | `accumulateFirstprivate` | `firstprivate(acc)` | Cada hilo recibe una copia privada e inicializada del acumulador base. | Test 5 (`testOpenMPClausesDemo`) |
-| `src/Butterfly1D.cpp` | `stageIndexLastprivate` | `lastprivate(last_stage)` | Preserva el valor del índice de la última etapa evaluada fuera de la región paralela. | Test 5 (`testOpenMPClausesDemo`) |
+Esta es una **fracción serial efectiva**, no un perfil directo: bit-reversal y
+swaps se ejecutan secuencialmente dentro de una fila, pero diferentes filas los
+ejecutan en paralelo. No se suman esos tiempos como fracción serial global.
+Creación de equipos, memoria no contigua, reparto, asignaciones y sincronización
+pueden producir desacuerdos con Amdahl, incluso `Sp<1` o superlinealidad.
 
----
+La serie duplica el tamaño hasta `--max-size` o el presupuesto `--memory-mib`
+(512 MiB por defecto). La cota incluye seis grillas equivalentes más temporales
+por hilo; es conservadora y **no una medición del RSS máximo**. Las cabeceras de
+las tablas indican el mayor tamaño medido y por qué se omitió el siguiente. Un
+tope configurado no demuestra el máximo físico de la máquina. No ejecutar tests,
+compilaciones u otras cargas simultáneamente durante una campaña de rendimiento.
 
-## 7. Tabla de Roles del Equipo
+## Archivos y siete gráficos
 
-| Rol | Responsable | Módulos Clave | Estado |
-| :--- | :--- | :--- | :--- |
-| **Rol 1: Modelo y Datos** | Integrante Rol 1 | `ComplexField.h/.cpp` | En desarrollo (`feat/Modelos-Datos`) |
-| **Rol 2: Núcleo Mariposa 1D** | Integrante Rol 2 | `Butterfly1D.h/.cpp`, `test_butterfly1d.cpp` | Implementado y Validado (`feat/Mariposa`). Integración pendiente en `dev`.|
-| **Rol 3: FFT e IFFT 2D** | Integrante Rol 3 | `Fft2D.h/.cpp`, `test_fft2d.cpp` | Implementado; validación aislada con sustitutos (`feat/FFT`). Integración pendiente en `dev`. |
-| **Rol 4: Métricas y Benchmarks** | Integrante Rol 4 | `SpectrumMetrics.h/.cpp`, `Benchmark.h/.cpp` | Trabajo en su rama; integración posterior en `dev`. |
-| **Rol 5: Calidad, CI y Visualización** | Integrante Rol 5 | `Visualizer.h/.cpp`, tests globales | Trabajo en su rama; integración posterior en `dev`. |
+En `--output` (por defecto `results/`), con **espacios en los nombres**:
+
+| Archivo | Contenido |
+|---|---|
+| `benchmark results.dat` | Tamaño, layout, schedule, chunk, hilos solicitados/reales, repeticiones, promedio/desviación, RMSE, Parseval |
+| `scaling analysis.dat` | Speedup/eficiencia e incertidumbres, `f`, Amdahl, residual y ajuste acotado |
+| `performance plots.png` | Seis paneles: speedup, eficiencia, tiempo/chunk, tiempos de layouts, Amdahl y RMSE |
+| `spectrum.dat` | `k l abs(X[k,l])`, orden natural, escala lineal |
+| `spectrum.png` | Séptimo gráfico: módulo de un seno 2D conocido |
+| `roundtrip error.dat` | RMSE y error relativo de Parseval por configuración |
+
+Cada tabla incluye una cabecera con las columnas. Layout `0=in-place`, `1=Stockham`;
+schedule `0=static`, `1=dynamic`, `2=guided`. `chunk=0` identifica la serie de
+escalabilidad y el reparto static por defecto, no el barrido de chunks positivos.
+Las barras muestran desviación estándar o incertidumbre propagada, según el eje.
+
+El benchmark también exporta un seno `64×64` de frecuencias `(1,1)`: sus picos
+están en `(1,1)` y `(63,63)`, con módulo `MN/2=2048`. Para visualizar otro seno:
+
+```bash
+./build/fft2d spectrum --rows 64 --cols 32 --k 3 --l 5 \
+  --layout stockham --threads 4 --output results/sine
+python3 scripts/plot_results.py --input results/sine --spectrum-scale log
+```
+
+La figura usa escala lineal por defecto; `log` significa explícitamente
+`log10(1+|X|)`. El script lee las tablas, no inventa tiempos ni ejecuta una FFT.
+`demo` y `spectrum` solo exportan el espectro; sin tablas de benchmark el script
+genera únicamente `spectrum.png`. Las frecuencias degeneradas (seno nulo) se rechazan.
+Usar carpetas distintas para no mezclar campañas: nuevas ejecuciones reemplazan
+los archivos del mismo nombre.
+
+## Arquitectura, roles y OpenMP
+
+| Responsabilidad / rol de referencia | Módulos |
+|---|---|
+| 1: modelo y datos | `ComplexField.h/.cpp`: memoria row-major, semilla, campos `.dat` |
+| 2: núcleo 1D | `Butterfly1D.h/.cpp`: implementación original de `origin/feat/Mariposa`, ambos layouts |
+| 3: composición 2D | `Fft2D.h/.cpp`: filas, columnas y normalización |
+| 4: métricas y benchmarks | `SpectrumMetrics.h/.cpp`, `Benchmark.h/.cpp` |
+| 5: calidad y visualización | `Visualizer.h/.cpp`, `scripts/plot_results.py`, `tests/`, Docker/CI |
+| Integración | `src/main.cpp`: CLI y coordinación, sin copiar algoritmos |
+
+Los nombres de integrantes y la distribución en un equipo de cuatro deben ser
+completados por el equipo; no se atribuyen responsables ficticios.
+
+| Archivo / función | Cláusula | Justificación / ruta probada |
+|---|---|---|
+| `Fft2D.cpp`, `rowsPass`/`colsPass` | `parallel for`, `schedule(runtime)`, `shared` | Filas/columnas independientes; schedule y chunk configurables en benchmarks |
+| `Fft2D.cpp`, `forwardRows` | `task`, `single`, `taskwait`, `firstprivate(r)` | Tareas de filas con índice propio; comparadas con parallel for por la suite real |
+| `Fft2D.cpp`, `inverse` | `collapse(2)` | Normalización de celdas independientes |
+| `Butterfly1D.cpp`, `transformCooleyTukey` | `parallel for`, schedules, `barrier` | Barreras implícitas entre etapas; `transformStages` usa región persistente y barrera explícita |
+| `Butterfly1D.cpp`, `transformStockham` | `parallel for`, schedules, `collapse(2)` | Collapse solo parejas independientes de una etapa; barrera implícita antes del intercambio de buffers |
+| `Butterfly1D.cpp`, `initTwiddlesSingle` | `single` | Un productor de twiddles, probado por suite 1D |
+| `Butterfly1D.cpp`, `accumulateFirstprivate` | `firstprivate(acc)` | Copia inicializada por hilo, probada por suite 1D |
+| `Butterfly1D.cpp`, `stageIndexLastprivate` | `lastprivate(last_stage)` | Última iteración lógica, no último hilo en terminar |
+| `SpectrumMetrics.cpp`, `roundtripError` | `reduction`, `collapse(2)` | Suma de errores sin carreras |
+| `SpectrumMetrics.cpp`, `energy` | `reduction`, `atomic`, `critical`, `private`, `shared` | Tres sumas reales de Parseval comparadas por pruebas y demo |
+| `Visualizer.cpp`, `magnitudeNoWait` | `for nowait`, `shared` | Celdas independientes; fin de región sincroniza antes de consumir resultados |
+
+Se conservan ambos niveles: FFT 2D paralela por transformadas independientes y
+FFT 1D aislada paralela por mariposas. El núcleo original crea regiones OpenMP
+internas; con `OMP_MAX_ACTIVE_LEVELS=1` no se activan equipos anidados.
+El CLI fija ese límite para demo/espectro. No se eliminan dependencias entre etapas.
+
+Por petición del equipo se conserva el núcleo de `origin/feat/Mariposa` sin
+refactorizar: repite la operación de mariposa entre variantes, por lo que el
+requisito de una única lógica de mariposa queda pendiente. El núcleo 1D presupone
+longitudes potencia de dos; no llamar directamente con longitudes inválidas.
+Los resultados de rendimiento generados con el núcleo refactorizado anterior
+deben medirse de nuevo antes de atribuirlos a esta versión restaurada.
+
+## Docker y CI
+
+```bash
+docker build -t lab1-fft2d .
+docker run --rm lab1-fft2d
+docker run --rm lab1-fft2d make test
+```
+
+El Dockerfile instala dependencias, compila, ejecuta `make test` y una demo corta
+al construir. `.dockerignore` evita copiar objetos locales o resultados viejos.
+Los workflows en `../.github/workflows/` ejecutan pruebas reales en pushes y pull
+requests hacia `main`/`develop` que afectan a `Lab1` o al workflow correspondiente.
+`build.yml` instala dependencias y ejecuta `make test`, que compila y corre la suite.
+`docker.yml` construye la imagen, ejecuta explícitamente `make test` dentro del
+contenedor y luego la demo. CI no ejecuta una campaña de rendimiento independiente.
+
+El reporte técnico PDF y la asignación nominal de roles son entregables separados;
+esta implementación no los da por completados.

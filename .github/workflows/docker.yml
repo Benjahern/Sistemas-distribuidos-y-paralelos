@@ -19,6 +19,7 @@ jobs:
   docker:
     name: Build and run Lab1 container
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -27,5 +28,8 @@ jobs:
       - name: Build Docker image
         run: docker build --tag lab1-fft2d:ci --file Lab1/Dockerfile Lab1
 
-      - name: Run container build check
+      - name: Run full test suite in container
+        run: docker run --rm lab1-fft2d:ci make test
+
+      - name: Run FFT demonstration
         run: docker run --rm lab1-fft2d:ci

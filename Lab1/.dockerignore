@@ -1,0 +1,8 @@
+build/
+results/
+__pycache__/
+**/__pycache__/
+*.o
+*.d
+.git/
+.opencode/

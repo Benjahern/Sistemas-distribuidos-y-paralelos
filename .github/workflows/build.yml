@@ -1,19 +1,29 @@
-name: Build - Lab1
+name: Unit tests - Lab1
 
 on:
   push:
     branches: 
       - main
       - develop
+    paths:
+      - "Lab1/**"
+      - ".github/workflows/build.yml"
   pull_request:
     branches: 
       - main
       - develop
+    paths:
+      - "Lab1/**"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    name: Construccion bloque c++
+    name: Compilacion y ejecucion de test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: ./Lab1
@@ -23,11 +33,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3-numpy python3-matplotlib
       
-      - name: Clean
-        run: make clean
-
-      - name: Build
-        run: make all
-
+      - name: Compile and run full test suite (real modules and outputs)
+        run: make test
