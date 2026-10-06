@@ -1,41 +1,93 @@
-#ifndef COMPLEX_FIELD_H
-#define COMPLEX_FIELD_H
+# pragma once
+# include <vector>
+# include <complex>
+# include <cstddef>
+# include <string>
 
-#include <cstddef>
-#include <complex>
-#include <vector>
+class ComplexField{
 
-/**
- * @brief Rol 1: Modelo de datos para grilla compleja bidimensional M x N.
- *
- */
-class ComplexField {
-public:
-    ComplexField() = default;
-    ComplexField(size_t rows, size_t cols);
-    ComplexField(size_t rows, size_t cols, const std::complex<double>& initial_value);
-    ~ComplexField() = default;
+    public: 
+        using Complex = std::complex<double>;
 
-    size_t rows() const noexcept { return rows_; }
-    size_t cols() const noexcept { return cols_; }
-    size_t size() const noexcept { return data_.size(); }
+        ComplexField() = default;
 
-    std::complex<double>& at(size_t r, size_t c) { return data_[r * cols_ + c]; }
-    const std::complex<double>& at(size_t r, size_t c) const { return data_[r * cols_ + c]; }
+        ComplexField(size_t M, size_t N);
 
-    std::complex<double>& operator()(size_t r, size_t c) { return data_[r * cols_ + c]; }
-    const std::complex<double>& operator()(size_t r, size_t c) const { return data_[r * cols_ + c]; }
+        ComplexField(size_t M, size_t N, const Complex& initial_value);
 
-    std::complex<double>* data() noexcept { return data_.data(); }
-    const std::complex<double>* data() const noexcept { return data_.data(); }
+        size_t rows() const {
+            return rows_;
+        }
+        size_t cols() const {
+            return cols_;
+        }
 
-    std::complex<double>* row(size_t r) noexcept { return data_.data() + (r * cols_); }
-    const std::complex<double>* row(size_t r) const noexcept { return data_.data() + (r * cols_); }
+        size_t size() const {
+            return data_.size();
+        }
 
-private:
-    size_t rows_{0};
-    size_t cols_{0};
-    std::vector<std::complex<double>> data_;
+        Complex& at(size_t m, size_t n){
+            return data_[m * cols_ + n];
+        }
+
+        const Complex& at(size_t m, size_t n) const{
+            return data_[m * cols_ + n];
+        }
+
+        Complex& operator()(size_t m, size_t n){
+            return data_[m * cols_ + n];
+        }
+
+        const Complex& operator()(size_t m, size_t n) const{
+            return data_[m * cols_ + n];
+        }
+
+        Complex* data(){
+            return data_.data();
+        }
+        const Complex* data() const{
+            return data_.data();
+        }
+
+        Complex* row(size_t m){
+            return data_.data() + m * cols_;
+        }
+
+        const Complex* row(size_t m) const{
+            return data_.data() + m * cols_;
+        }
+
+        static bool isPowerOf2(size_t x);
+
+        static size_t bitReverse(size_t x, size_t bits);
+
+        static void bitReversePermute(Complex* arr, size_t n);
+
+        // Saca la fila m de la grilla y la deja en fila (fila tiene cols() elementos)
+        void getRow(size_t m, Complex* fila) const;
+
+        // Toma fila y la pone en la fila m de la grilla
+        void setRow(size_t m, const Complex* fila);
+  
+        // Saca la columna n de la grilla y la deja en columna (columna tiene rows() elementos)
+        void getCol(size_t n, Complex* columna) const;
+
+        // Toma columna y la pone en la columna n de la grilla
+        void setCol(size_t n, const Complex* columna);
+
+        void fillImpulse();
+
+        void fillSine(size_t k, size_t l);
+
+        void fillRandom(unsigned seed);
+
+        void writeDat(const std::string& path) const;
+
+        void readDat(const std::string& path);
+
+    private:
+        size_t rows_{0};
+        size_t cols_{0};
+        std::vector<Complex> data_;
+
 };
-
-#endif // COMPLEX_FIELD_H
