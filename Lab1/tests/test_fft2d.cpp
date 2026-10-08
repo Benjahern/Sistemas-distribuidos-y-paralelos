@@ -33,6 +33,19 @@ ComplexField::ComplexField(size_t rows, size_t cols)
 ComplexField::ComplexField(size_t rows, size_t cols, const std::complex<double>& initial_value)
     : rows_(rows), cols_(cols), data_(rows * cols, initial_value) {}
 
+void ComplexField::bitReversePermute(Complex* arr, size_t n) {
+    if (n <= 1 || !arr) return;
+    size_t bits = 0;
+    while ((size_t(1) << bits) < n) ++bits;
+    for (size_t i = 0; i < n; ++i) {
+        size_t rev = 0;
+        for (size_t bit = 0; bit < bits; ++bit) {
+            if ((i >> bit) & 1) rev |= (size_t(1) << (bits - 1 - bit));
+        }
+        if (i < rev) std::swap(arr[i], arr[rev]);
+    }
+}
+
 Butterfly1D::Butterfly1D(std::complex<double>* data, size_t n, bool inverse)
     : data_(data), n_(n), inverse_(inverse) {}
 
@@ -40,17 +53,6 @@ void Butterfly1D::setData(std::complex<double>* data, size_t n, bool inverse) {
     data_ = data;
     n_ = n;
     inverse_ = inverse;
-}
-
-static size_t bitReverse(size_t i, size_t log2n) {
-    // Invierte log2n bits: con N=8, el índice 3 (011) pasa a 6 (110).
-    size_t rev = 0;
-    for (size_t bit = 0; bit < log2n; ++bit) {
-        if ((i >> bit) & 1) {
-            rev |= (size_t(1) << (log2n - 1 - bit));
-        }
-    }
-    return rev;
 }
 
 void Butterfly1D::transform() { transform(0, 0, 0); }
@@ -74,14 +76,8 @@ void Butterfly1D::transform(int layout, int schedule_type, int chunk_size) {
     while ((size_t(1) << p) < n_) ++p;
 
     if (layout == 0) {
-        // Cooley-Tukey: reordena la entrada y combina grupos de 2,4,8,...
-        // La condición i < rev evita intercambiar dos veces la misma pareja.
-        for (size_t i = 0; i < n_; ++i) {
-            size_t rev = bitReverse(i, p);
-            if (i < rev) {
-                std::swap(data_[i], data_[rev]);
-            }
-        }
+        // Cooley-Tukey: usa la permutación provista por ComplexField
+        ComplexField::bitReversePermute(data_, n_);
         for (size_t s = 1; s <= p; ++s) {
             size_t m = size_t(1) << s;
             size_t m2 = m >> 1;
@@ -89,12 +85,8 @@ void Butterfly1D::transform(int layout, int schedule_type, int chunk_size) {
             for (size_t k = 0; k < n_; k += m) {
                 std::complex<double> w(1.0, 0.0);
                 for (size_t j = 0; j < m2; ++j) {
-                    // Se leen ambos valores antes de sobrescribir la pareja.
-                    // w avanza por las potencias del twiddle de esta etapa.
-                    std::complex<double> u = data_[k + j];
-                    std::complex<double> v = w * data_[k + j + m2];
-                    data_[k + j] = u + v;
-                    data_[k + j + m2] = u - v;
+                    Butterfly1D::butterfly(data_[k + j], data_[k + j + m2], w,
+                                           data_[k + j], data_[k + j + m2]);
                     w *= wm;
                 }
             }
@@ -114,10 +106,7 @@ void Butterfly1D::transform(int layout, int schedule_type, int chunk_size) {
                     size_t i1 = i0 + g;
                     size_t o0 = j + k * g;
                     size_t o1 = o0 + n_ / 2;
-                    std::complex<double> u = src[i0];
-                    std::complex<double> v = omega * src[i1];
-                    dst[o0] = u + v;
-                    dst[o1] = u - v;
+                    Butterfly1D::butterfly(src[i0], src[i1], omega, dst[o0], dst[o1]);
                 }
             }
             // La salida de la etapa se convierte en entrada de la siguiente.

@@ -63,7 +63,7 @@ pipeline:
 test-role2: $(BUILD_DIR)/test_butterfly1d
 	OMP_NUM_THREADS=$(TEST_THREADS) "$(abspath $(BUILD_DIR)/test_butterfly1d)"
 
-$(BUILD_DIR)/test_butterfly1d: $(BUILD_DIR)/tests/test_butterfly1d.o $(BUILD_DIR)/Butterfly1D.o
+$(BUILD_DIR)/test_butterfly1d: $(BUILD_DIR)/tests/test_butterfly1d.o $(BUILD_DIR)/Butterfly1D.o $(BUILD_DIR)/ComplexField.o
 	$(CXX) $(CXXFLAGS) $(OPENMP) $^ -o $@
 
 test-role3: $(BUILD_DIR)/test_fft2d
