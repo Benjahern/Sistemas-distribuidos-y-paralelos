@@ -104,7 +104,7 @@ OMP_PROC_BIND=close OMP_PLACES=cores make benchmark \
 make plots
 
 # Ampliar incluyendo los procesadores lógicos disponibles (Linux):
-OMP_PROC_BIND=close OMP_PLACES=cores make benchmark OUTPUT=results/full \
+OMP_PROC_BIND=close OMP_PLACES=threads make benchmark OUTPUT=results/full \
   BENCHMARK_ARGS="--min-size 128 --max-size 4096 --chunk-grid 256 --threads 1,2,4,8,$(nproc) --memory-mib 512"
 
 # Regenerar figuras sin medir de nuevo:
@@ -112,6 +112,10 @@ make plots OUTPUT=results/full
 ```
 
 `make benchmark` mide y escribe datos; `make plots` añade los PNG.
+También escribe `benchmark_manifest.json`: comando, fechas UTC, afinidad y entorno
+OpenMP, SHA-256 del ejecutable, fuentes y tablas. Así se identifica la campaña sin
+deducir su procedencia de fechas de archivos ni de afirmaciones del README. El
+wrapper comprueba que fuentes y ejecutable no cambien durante la medición.
 Usa tamaños desde 128 hasta 1024 por defecto; sin `--threads`,
 agrega `omp_get_num_procs()` a `1,2,4,8`, sin duplicados. Siempre incluye un hilo.
 El barrido de chunks usa `--chunk-grid` (256 por defecto), chunks `1,2,4,8,16,32,64`,
@@ -182,6 +186,7 @@ En `--output` (por defecto `results/`), con **espacios en los nombres**:
 | `spectrum.dat` | `k l abs(X[k,l])`, orden natural, escala lineal |
 | `spectrum.png` | Séptimo gráfico: módulo de un seno 2D conocido |
 | `roundtrip error.dat` | RMSE y error relativo de Parseval por configuración |
+| `benchmark_manifest.json` | Procedencia verificable de una ejecución de `make benchmark` |
 
 Cada tabla incluye una cabecera con las columnas. Layout `0=in-place`, `1=Stockham`;
 schedule `0=static`, `1=dynamic`, `2=guided`. `chunk=0` identifica la serie de
@@ -202,7 +207,11 @@ La figura usa escala lineal por defecto; `log` significa explícitamente
 `demo` y `spectrum` solo exportan el espectro; sin tablas de benchmark el script
 genera únicamente `spectrum.png`. Las frecuencias degeneradas (seno nulo) se rechazan.
 Usar carpetas distintas para no mezclar campañas: nuevas ejecuciones reemplazan
-los archivos del mismo nombre.
+los archivos del mismo nombre. Al exportar un espectro nuevo se elimina su PNG
+anterior; al escribir tablas de benchmark se invalidan el gráfico de rendimiento
+y el manifiesto anteriores. Ejecutar `make plots` después de generar datos. La PNG
+del espectro incluye metadatos SHA-256 de `spectrum.dat`, dimensiones y escala,
+para comprobar que ambos archivos corresponden a la misma exportación.
 
 ## Arquitectura, roles y OpenMP
 
@@ -241,8 +250,12 @@ Por petición del equipo se conserva el núcleo de `origin/feat/Mariposa` sin
 refactorizar: repite la operación de mariposa entre variantes, por lo que el
 requisito de una única lógica de mariposa queda pendiente. El núcleo 1D presupone
 longitudes potencia de dos; no llamar directamente con longitudes inválidas.
-Los resultados de rendimiento generados con el núcleo refactorizado anterior
-deben medirse de nuevo antes de atribuirlos a esta versión restaurada.
+La campaña de `results/` se repitió el 8 de octubre de 2026 con este núcleo:
+134 puntos, tamaños 128–2048, 1/2/4/8/16 hilos y diez repeticiones por punto.
+`results/benchmark_manifest.json` identifica el ejecutable, las fuentes y las
+tablas mediante SHA-256. El tamaño 4096 quedó fuera del presupuesto configurado
+de 512 MiB; no se presenta como un límite físico de la máquina. La revisión
+completa frente al enunciado está en `AUDITORIA_PDF.md`.
 
 ## Docker y CI
 

@@ -176,6 +176,9 @@ void Benchmark::writeResults(const BenchmarkConfig& config, const std::vector<Be
                              const std::string& limit_reason) {
     std::filesystem::create_directories(config.output_dir);
     const auto path = [&](const char* name) { return (std::filesystem::path(config.output_dir) / name).string(); };
+    // Invalidar derivados/procedencia antiguos incluso si se usa el CLI directamente.
+    std::filesystem::remove(path("performance plots.png"));
+    std::filesystem::remove(path("benchmark_manifest.json"));
     std::ofstream timing(path("benchmark results.dat")), scaling_out(path("scaling analysis.dat")),
                   error(path("roundtrip error.dat"));
     if (!timing || !scaling_out || !error) throw std::runtime_error("No se pueden escribir los resultados");

@@ -1,4 +1,5 @@
 #include "Visualizer.h"
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <stdexcept>
@@ -18,6 +19,10 @@ std::vector<double> Visualizer::magnitudeNoWait(const ComplexField& spectrum) {
 
 void Visualizer::writeSpectrum(const ComplexField& spectrum, const std::string& path) {
     const auto magnitudes = magnitudeNoWait(spectrum);
+    // Una figura de la exportación anterior ya no representa estos datos.
+    auto figure = std::filesystem::path(path);
+    figure.replace_extension(".png");
+    std::filesystem::remove(figure);
     std::ofstream out(path);
     if (!out) throw std::runtime_error("No se pudo escribir " + path);
     out << "# k l magnitude (escala lineal, orden natural)\n" << std::setprecision(17);

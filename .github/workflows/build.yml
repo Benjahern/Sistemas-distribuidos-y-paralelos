@@ -1,4 +1,4 @@
-name: Unit tests - Lab1
+name: Unit tests - Build - Lab1
 
 on:
   push:
