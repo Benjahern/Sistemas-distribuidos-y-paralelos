@@ -105,10 +105,46 @@ public:
    */
   int stageIndexLastprivate() const;
 
+  /**
+   * @brief Operación atómica de mariposa radix-2: u = in0, v = omega * in1; out0 = u + v, out1 = u - v.
+   *
+   * Única lógica matemática de mariposa compartida por Cooley-Tukey (in-place),
+   * Stockham (out-of-place) y todas las cláusulas/schedules OpenMP.
+   *
+   * @param in0 Primer elemento de entrada.
+   * @param in1 Segundo elemento de entrada (se multiplica por twiddle omega).
+   * @param omega Factor twiddle exp(sign * 2 * pi * i * r / m).
+   * @param out0 Salida u + v.
+   * @param out1 Salida u - v.
+   */
+  static inline void butterfly(const std::complex<double> &in0,
+                               const std::complex<double> &in1,
+                               const std::complex<double> &omega,
+                               std::complex<double> &out0,
+                               std::complex<double> &out1) noexcept {
+    const std::complex<double> v = omega * in1;
+    const std::complex<double> u = in0;
+    out0 = u + v;
+    out1 = u - v;
+  }
+
 private:
   std::complex<double> *data_{nullptr}; ///< Puntero al arreglo de datos complejos en memoria.
   size_t n_{0};                          ///< Longitud de la señal 1D (potencia de 2).
   bool inverse_{false};                  ///< Dirección de la transformada (false = directa, true = inversa).
+
+  /**
+   * @brief Aplica la mariposa en la posición idx de la etapa Cooley-Tukey delegando en butterfly().
+   */
+  void cooleyTukeyButterflyAt(size_t idx, size_t m, size_t m2, double sign, double pi);
+
+  /**
+   * @brief Aplica la mariposa en la posición (k, j) de la etapa Stockham delegando en butterfly().
+   */
+  void stockhamButterflyAt(const std::complex<double> *src,
+                           std::complex<double> *dst,
+                           size_t k, size_t j, size_t g, size_t m,
+                           double sign, double pi);
 
   /**
    * @brief Implementación interna del algoritmo in-place Cooley-Tukey.

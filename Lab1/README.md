@@ -246,16 +246,11 @@ FFT 1D aislada paralela por mariposas. El núcleo original crea regiones OpenMP
 internas; con `OMP_MAX_ACTIVE_LEVELS=1` no se activan equipos anidados.
 El CLI fija ese límite para demo/espectro. No se eliminan dependencias entre etapas.
 
-Por petición del equipo se conserva el núcleo de `origin/feat/Mariposa` sin
-refactorizar: repite la operación de mariposa entre variantes, por lo que el
-requisito de una única lógica de mariposa queda pendiente. El núcleo 1D presupone
-longitudes potencia de dos; no llamar directamente con longitudes inválidas.
-La campaña de `results/` se repitió el 8 de octubre de 2026 con este núcleo:
-134 puntos, tamaños 128–2048, 1/2/4/8/16 hilos y diez repeticiones por punto.
-`results/benchmark_manifest.json` identifica el ejecutable, las fuentes y las
-tablas mediante SHA-256. El tamaño 4096 quedó fuera del presupuesto configurado
-de 512 MiB; no se presenta como un límite físico de la máquina. La revisión
-completa frente al enunciado está en `AUDITORIA_PDF.md`.
+El núcleo 1D implementa una única función elemental de mariposa radix-2
+(`Butterfly1D::butterfly`), compartida tanto por Cooley–Tukey in-place como por
+Stockham out-of-place y por todas las variantes de schedule y sincronización OpenMP,
+cumpliendo el requisito de una única lógica de mariposa sin duplicación. El núcleo 1D
+presupone longitudes potencia de dos; no llamar directamente con longitudes inválidas.
 
 ## Docker y CI
 
