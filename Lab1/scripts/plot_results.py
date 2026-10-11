@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Figuras reproducibles desde los .dat; nunca ejecuta ni reemplaza la FFT."""
 import argparse
+import hashlib
 from pathlib import Path
 
 import matplotlib
@@ -98,7 +99,10 @@ def performance(directory):
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=7)
     fig.suptitle("FFT directa completa; barras: desviación estándar / incertidumbre propagada")
-    fig.savefig(directory / "performance plots.png", dpi=160)
+    fig.savefig(directory / "performance plots.png", dpi=160,
+                metadata={"TimingSHA256": hashlib.sha256((directory / "benchmark results.dat").read_bytes()).hexdigest(),
+                          "ScalingSHA256": hashlib.sha256((directory / "scaling analysis.dat").read_bytes()).hexdigest(),
+                          "ErrorsSHA256": hashlib.sha256((directory / "roundtrip error.dat").read_bytes()).hexdigest()})
     plt.close(fig)
 
 
@@ -124,7 +128,9 @@ def spectrum(directory, scale):
                     ha="right" if dx < 0 else "left", va="top" if dy < 0 else "bottom",
                     bbox={"facecolor": "black", "alpha": 0.6})
     ax.set(xlabel="l", ylabel="k", title=f"Seno 2D {rows}×{cols}: espectro en orden natural\n{label}")
-    fig.savefig(directory / "spectrum.png", dpi=160)
+    fig.savefig(directory / "spectrum.png", dpi=160,
+                metadata={"SpectrumSHA256": hashlib.sha256((directory / "spectrum.dat").read_bytes()).hexdigest(),
+                          "SpectrumShape": f"{rows}x{cols}", "SpectrumScale": scale})
     plt.close(fig)
 
 

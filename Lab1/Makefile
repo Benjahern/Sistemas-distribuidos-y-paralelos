@@ -45,7 +45,7 @@ $(BUILD_DIR)/test_metrics_benchmark: $(BUILD_DIR)/tests/test_metrics_benchmark.o
 	$(CXX) $(CXXFLAGS) $(OPENMP) $^ -o $@
 
 benchmark: all
-	"$(abspath $(BUILD_DIR)/fft2d)" benchmark $(BENCHMARK_ARGS) --output "$(OUTPUT)"
+	$(PYTHON) scripts/run_benchmark.py --executable "$(abspath $(BUILD_DIR)/fft2d)" --output "$(OUTPUT)" -- $(BENCHMARK_ARGS)
 
 demo: all
 	"$(abspath $(BUILD_DIR)/fft2d)" demo --output "$(OUTPUT)"
