@@ -141,9 +141,8 @@ void Butterfly1D::cooleyTukeyButterflyAt(size_t idx, size_t m, size_t m2,
 
 void Butterfly1D::stockhamButterflyAt(const std::complex<double> *src,
                                       std::complex<double> *dst,
-                                      size_t k, size_t j, size_t g, size_t m,
-                                      double sign, double pi) {
-  std::complex<double> omega = std::polar(1.0, sign * 2.0 * pi * static_cast<double>(k) / static_cast<double>(m));
+                                      size_t k, size_t j, size_t g,
+                                      const std::complex<double> &omega) {
   size_t i0 = j + 2 * k * g;
   size_t i1 = i0 + g;
   size_t o0 = j + k * g;
@@ -178,7 +177,7 @@ void Butterfly1D::transformCooleyTukey(int schedule_type, int chunk_size,
         size_t m = size_t(1) << s;
         size_t m2 = m >> 1;
 
-        #pragma omp for schedule(static)
+        #pragma omp for schedule(static) nowait
         for (size_t idx = 0; idx < total_bf; ++idx) {
           cooleyTukeyButterflyAt(idx, m, m2, sign, pi);
         }
@@ -227,14 +226,16 @@ void Butterfly1D::transformStockham(int schedule_type, int chunk_size,
       #pragma omp parallel for collapse(2) default(none) shared(src, dst, l, g, m, sign, pi)
       for (size_t k = 0; k < l; ++k) {
         for (size_t j = 0; j < g; ++j) {
-          stockhamButterflyAt(src.data(), dst.data(), k, j, g, m, sign, pi);
+          const std::complex<double> omega = std::polar(1.0, sign * 2.0 * pi * static_cast<double>(k) / static_cast<double>(m));
+          stockhamButterflyAt(src.data(), dst.data(), k, j, g, omega);
         }
       }
     } else {
       // CASO 2: Schedules configurables sobre el bucle externo k delegando en dispatchSchedule1D
       auto op = [this, &src, &dst, g, m, sign, pi](size_t k) {
+        const std::complex<double> omega = std::polar(1.0, sign * 2.0 * pi * static_cast<double>(k) / static_cast<double>(m));
         for (size_t j = 0; j < g; ++j) {
-          stockhamButterflyAt(src.data(), dst.data(), k, j, g, m, sign, pi);
+          stockhamButterflyAt(src.data(), dst.data(), k, j, g, omega);
         }
       };
       dispatchSchedule1D(l, schedule_type, chunk_size, op);
@@ -287,6 +288,14 @@ void Butterfly1D::accumulateFirstprivate(double base_val) {
   for (size_t i = 0; i < n_; ++i) {
     data_[i] += acc;
   }
+}
+
+/**
+ * @brief Demuestra la cláusula 'firstprivate(acc)' con valor por defecto.
+ * @return Salida: void.
+ */
+void Butterfly1D::accumulateFirstprivate() {
+  accumulateFirstprivate(1.0);
 }
 
 /**

@@ -1,3 +1,4 @@
+#undef NDEBUG
 #include "Butterfly1D.h"
 #include <cassert>
 #include <cmath>
@@ -210,9 +211,23 @@ void testOpenMPClausesDemo() {
     assert(isClose(data[i], {5.0, 0.0}));
   }
 
+  // Probar sobrecarga accumulateFirstprivate() sin argumentos (por defecto suma 1.0)
+  b.accumulateFirstprivate();
+  for (size_t i = 0; i < N; ++i) {
+    assert(isClose(data[i], {6.0, 0.0}));
+  }
+
+  // Probar setData actualizando buffer
+  std::vector<std::complex<double>> new_buf(4, {10.0, 0.0});
+  b.setData(new_buf.data(), 4, false);
+  b.accumulateFirstprivate(2.0);
+  for (size_t i = 0; i < 4; ++i) {
+    assert(isClose(new_buf[i], {12.0, 0.0}));
+  }
+
   // Probar lastprivate(last_stage)
   int last_stage = b.stageIndexLastprivate();
-  assert(last_stage == 3); // log2(8) = 3
+  assert(last_stage == 2); // log2(4) = 2 tras setData en N=4
 
   std::cout << "PASSED\n";
 }
