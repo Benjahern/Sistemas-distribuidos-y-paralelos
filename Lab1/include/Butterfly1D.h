@@ -100,6 +100,12 @@ public:
   void accumulateFirstprivate(double base_val);
 
   /**
+   * @brief Demuestra la cláusula 'firstprivate(acc)' con valor por defecto 1.0 según la firma de la especificación.
+   * @return Salida: void.
+   */
+  void accumulateFirstprivate();
+
+  /**
    * @brief Demuestra la cláusula 'lastprivate(last_stage)' obteniendo la última etapa calculada.
    * @return Salida: int representando el índice de la última etapa (log2(n)).
    */
@@ -143,8 +149,8 @@ private:
    */
   void stockhamButterflyAt(const std::complex<double> *src,
                            std::complex<double> *dst,
-                           size_t k, size_t j, size_t g, size_t m,
-                           double sign, double pi);
+                           size_t k, size_t j, size_t g,
+                           const std::complex<double> &omega);
 
   /**
    * @brief Implementación interna del algoritmo in-place Cooley-Tukey.
