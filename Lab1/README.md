@@ -60,9 +60,10 @@ No genera el reporte PDF ni sustituye el análisis de resultados.
 la configuración del CLI en el Makefile. Para personalizar demo, espectro o escala
 de los gráficos, usar directamente el ejecutable o el script, como se muestra abajo.
 
-`make test` ejecuta pruebas 1D, composición 2D con sustitutos **y con los módulos
-reales**, modelo de datos, métricas, estadísticas, Amdahl, CLI y generación de PNG.
-`make test-role3` mantiene la suite aislada; `make test-integration` usa el núcleo real.
+`make test` ejecuta pruebas 1D, composición 2D con los módulos reales,
+modelo de datos, métricas, estadísticas, Amdahl, CLI y generación de PNG.
+`make test-role3` ejecuta la suite de FFT/IFFT 2D enlazada con `ComplexField` y
+`Butterfly1D`; `make test-integration` es un alias del mismo target.
 `TEST_THREADS=4` controla el equipo inicial de las suites antiguas; estas también
 prueban explícitamente 1, 2, 4 y 8 hilos.
 
@@ -231,7 +232,7 @@ completados por el equipo; no se atribuyen responsables ficticios.
 |---|---|---|
 | `Fft2D.cpp`, `rowsPass`/`colsPass` | `parallel for`, `schedule(runtime)`, `shared` | Filas/columnas independientes; schedule y chunk configurables en benchmarks |
 | `Fft2D.cpp`, `forwardRows` | `task`, `single`, `taskwait`, `firstprivate(r)` | Tareas de filas con índice propio; comparadas con parallel for por la suite real |
-| `Fft2D.cpp`, `inverse` | `collapse(2)` | Normalización de celdas independientes |
+| `Fft2D.cpp`, `inverse` | `collapse(2)`, `schedule(static)` | Normalización de celdas independientes con costo uniforme y bloques contiguos |
 | `Butterfly1D.cpp`, `transformCooleyTukey` | `parallel for`, schedules, `barrier` | Barreras implícitas entre etapas; `transformStages` usa región persistente y barrera explícita |
 | `Butterfly1D.cpp`, `transformStockham` | `parallel for`, schedules, `collapse(2)` | Collapse solo parejas independientes de una etapa; barrera implícita antes del intercambio de buffers |
 | `Butterfly1D.cpp`, `initTwiddlesSingle` | `single` | Un productor de twiddles, probado por suite 1D |

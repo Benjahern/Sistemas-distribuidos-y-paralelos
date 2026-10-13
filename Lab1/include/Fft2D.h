@@ -77,7 +77,6 @@ private:
     int default_layout_{LAYOUT_INPLACE};
 
     // Validaciones de robustez
-    static bool isPowerOfTwo(std::size_t n) noexcept;
     void validateField(const ComplexField& field) const;
     static void validateLayout(int layout);
     static void validateTaskType(int task_type);

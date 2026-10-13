@@ -1,6 +1,5 @@
 #include "Fft2D.h"
 #include "ComplexField.h"
-#include "Butterfly1D.h"
 
 #include <iostream>
 #include <vector>
@@ -17,109 +16,6 @@
 // std::abs(error_complejo) mide la distancia entre dos valores complejos.
 // Se permite un error pequeño de redondeo, en vez de exigir igualdad exacta.
 constexpr double TOLERANCE = 1e-10;
-
-// ============================================================================
-// STUBS / MOCKS para Rol 1 (ComplexField) y Rol 2 (Butterfly1D)
-// Opt-in mediante flag de compilación -DFFT2D_STANDALONE_STUBS.
-// Al integrar con los roles reales, este bloque no se compila para evitar duplicados.
-// ============================================================================
-#ifdef FFT2D_STANDALONE_STUBS
-
-// Modelo mínimo para las pruebas: un vector de rows*cols valores complejos.
-// No incluye generación ni entrada/salida de datos propias del rol 1.
-ComplexField::ComplexField(size_t rows, size_t cols)
-    : rows_(rows), cols_(cols), data_(rows * cols, std::complex<double>(0.0, 0.0)) {}
-
-ComplexField::ComplexField(size_t rows, size_t cols, const std::complex<double>& initial_value)
-    : rows_(rows), cols_(cols), data_(rows * cols, initial_value) {}
-
-void ComplexField::bitReversePermute(Complex* arr, size_t n) {
-    if (n <= 1 || !arr) return;
-    size_t bits = 0;
-    while ((size_t(1) << bits) < n) ++bits;
-    for (size_t i = 0; i < n; ++i) {
-        size_t rev = 0;
-        for (size_t bit = 0; bit < bits; ++bit) {
-            if ((i >> bit) & 1) rev |= (size_t(1) << (bits - 1 - bit));
-        }
-        if (i < rev) std::swap(arr[i], arr[rev]);
-    }
-}
-
-Butterfly1D::Butterfly1D(std::complex<double>* data, size_t n, bool inverse)
-    : data_(data), n_(n), inverse_(inverse) {}
-
-void Butterfly1D::setData(std::complex<double>* data, size_t n, bool inverse) {
-    data_ = data;
-    n_ = n;
-    inverse_ = inverse;
-}
-
-void Butterfly1D::transform() { transform(0, 0, 0); }
-void Butterfly1D::transform(int schedule_type) { transform(0, schedule_type, 0); }
-void Butterfly1D::transform(int schedule_type, int chunk_size) { transform(0, schedule_type, chunk_size); }
-void Butterfly1D::transformCollapse() { transform(0, 0, 0); }
-void Butterfly1D::transformStages() { transform(0, 0, 0); }
-
-void Butterfly1D::transform(int layout, int schedule_type, int chunk_size) {
-    // Este sustituto es serial: ignora schedule y chunk. Las pruebas OpenMP
-    // validan el reparto 2D de Fft2D, no las barreras internas del rol 2.
-    (void)schedule_type;
-    (void)chunk_size;
-    if (n_ <= 1 || !data_) return;
-
-    const double pi = 3.14159265358979323846;
-    // Cambiar el signo da la inversa sin escala requerida por Fft2D.
-    const double sign = inverse_ ? 1.0 : -1.0;
-
-    size_t p = 0;
-    while ((size_t(1) << p) < n_) ++p;
-
-    if (layout == 0) {
-        // Cooley-Tukey: usa la permutación provista por ComplexField
-        ComplexField::bitReversePermute(data_, n_);
-        for (size_t s = 1; s <= p; ++s) {
-            size_t m = size_t(1) << s;
-            size_t m2 = m >> 1;
-            std::complex<double> wm = std::polar(1.0, sign * 2.0 * pi / static_cast<double>(m));
-            for (size_t k = 0; k < n_; k += m) {
-                std::complex<double> w(1.0, 0.0);
-                for (size_t j = 0; j < m2; ++j) {
-                    Butterfly1D::butterfly(data_[k + j], data_[k + j + m2], w,
-                                           data_[k + j], data_[k + j + m2]);
-                    w *= wm;
-                }
-            }
-        }
-    } else {
-        // Stockham: cada etapa lee src y escribe dst con otro orden de índices.
-        // Así incorpora el reordenamiento sin una permutación bit-reversal.
-        std::vector<std::complex<double>> src(data_, data_ + n_);
-        std::vector<std::complex<double>> dst(n_);
-        for (size_t s = 0; s < p; ++s) {
-            size_t l = size_t(1) << s;
-            size_t g = n_ / (size_t(1) << (s + 1));
-            for (size_t k = 0; k < l; ++k) {
-                std::complex<double> omega = std::polar(1.0, sign * 2.0 * pi * static_cast<double>(k) / static_cast<double>(size_t(1) << (s + 1)));
-                for (size_t j = 0; j < g; ++j) {
-                    size_t i0 = j + 2 * k * g;
-                    size_t i1 = i0 + g;
-                    size_t o0 = j + k * g;
-                    size_t o1 = o0 + n_ / 2;
-                    Butterfly1D::butterfly(src[i0], src[i1], omega, dst[o0], dst[o1]);
-                }
-            }
-            // La salida de la etapa se convierte en entrada de la siguiente.
-            // Este sustituto termina todo el bucle antes de intercambiar buffers.
-            src.swap(dst);
-        }
-        for (size_t i = 0; i < n_; ++i) {
-            data_[i] = src[i];
-        }
-    }
-}
-
-#endif // FFT2D_STANDALONE_STUBS
 
 // ============================================================================
 // DFT 2D Ingenua (Referencia Matemática Independiente O(M^2 * N^2))
@@ -401,46 +297,38 @@ void testBoundInstance() {
 }
 
 void testOpenMpTaskVsParallelFor() {
-    // Se comparan solo las filas para aislar el mecanismo de reparto.
-    // Las tres rutas deben producir el mismo resultado desde la misma entrada.
+    // Comparar filas comprueba el reparto. Completar columnas y contrastar
+    // con la DFT independiente detecta tareas pendientes al retornar.
     std::cout << "[Test 8] Comparación OpenMP parallel for vs task (con y sin single)... ";
-    const size_t M = 16;
-    const size_t N = 8;
-    ComplexField f_base(M, N);
-    for (size_t r = 0; r < M; ++r) {
-        for (size_t c = 0; c < N; ++c) {
-            f_base.at(r, c) = std::complex<double>(r * 2.0 + c, r - c * 1.5);
-        }
-    }
-
-    ComplexField f_for = f_base;
-    ComplexField f_task_single = f_base;
-    ComplexField f_task_no_single = f_base;
-
     Fft2D fft;
-    fft.forwardRows(f_for, Fft2D::TASK_TYPE_PARALLEL_FOR);
-    fft.forwardRows(f_task_single, Fft2D::TASK_TYPE_TASK, true);
-    fft.forwardRows(f_task_no_single, Fft2D::TASK_TYPE_TASK, false);
-
-    for (size_t r = 0; r < M; ++r) {
-        for (size_t c = 0; c < N; ++c) {
-            double d1 = std::abs(f_for.at(r, c) - f_task_single.at(r, c));
-            double d2 = std::abs(f_for.at(r, c) - f_task_no_single.at(r, c));
-            assert(d1 < TOLERANCE);
-            assert(d2 < TOLERANCE);
-        }
-    }
-
-    // Cobertura explícita de Stockham en las ramas task
-    ComplexField s_for = f_base, s_task1 = f_base, s_task0 = f_base;
-    fft.forwardRows(s_for,   Fft2D::TASK_TYPE_PARALLEL_FOR, true,  Fft2D::LAYOUT_STOCKHAM);
-    fft.forwardRows(s_task1, Fft2D::TASK_TYPE_TASK,         true,  Fft2D::LAYOUT_STOCKHAM);
-    fft.forwardRows(s_task0, Fft2D::TASK_TYPE_TASK,         false, Fft2D::LAYOUT_STOCKHAM);
-
-    for (size_t r = 0; r < M; ++r) {
-        for (size_t c = 0; c < N; ++c) {
-            assert(std::abs(s_for.at(r, c) - s_task1.at(r, c)) < TOLERANCE);
-            assert(std::abs(s_for.at(r, c) - s_task0.at(r, c)) < TOLERANCE);
+    const std::vector<std::pair<size_t, size_t>> dims = {{1, 8}, {2, 8}, {16, 8}};
+    for (const auto& dim : dims) {
+        ComplexField original(dim.first, dim.second);
+        original.fillRandom(42);
+        const ComplexField reference = naiveDft2D(original);
+        for (int layout : {Fft2D::LAYOUT_INPLACE, Fft2D::LAYOUT_STOCKHAM}) {
+            for (int threads : {1, 2, 4, 8}) {
+                omp_set_num_threads(threads);
+                ComplexField rows_reference = original;
+                fft.forwardRows(rows_reference, Fft2D::TASK_TYPE_PARALLEL_FOR, true, layout);
+                for (int task_type : {Fft2D::TASK_TYPE_TASK, Fft2D::TASK_TYPE_PARALLEL_FOR}) {
+                    for (bool use_single : {true, false}) {
+                        ComplexField field = original;
+                        fft.forwardRows(field, task_type, use_single, layout);
+                        for (size_t i = 0; i < field.size(); ++i) {
+                            assert(std::abs(field.data()[i] - rows_reference.data()[i]) < TOLERANCE);
+                        }
+                        fft.forwardCols(field, layout);
+                        for (size_t i = 0; i < field.size(); ++i) {
+                            assert(std::abs(field.data()[i] - reference.data()[i]) < TOLERANCE);
+                        }
+                        fft.inverse(field, layout);
+                        for (size_t i = 0; i < field.size(); ++i) {
+                            assert(std::abs(field.data()[i] - original.data()[i]) < TOLERANCE);
+                        }
+                    }
+                }
+            }
         }
     }
     std::cout << "PASÓ OK!" << std::endl;
@@ -451,13 +339,14 @@ void testScheduleSweep() {
     // Esta prueba comprueba corrección con cada reparto, no mide rendimiento.
     std::cout << "[Test 9] Barrido de OpenMP schedule(runtime) (static, dynamic, guided)... ";
     const size_t M = 8;
-    const size_t N = 8;
+    const size_t N = 4;
     ComplexField original(M, N);
     for (size_t r = 0; r < M; ++r) {
         for (size_t c = 0; c < N; ++c) {
             original.at(r, c) = std::complex<double>(r + 1.0, c + 2.0);
         }
     }
+    const ComplexField reference = naiveDft2D(original);
 
     // Guardar el schedule original para restaurarlo al final
     omp_sched_t orig_kind;
@@ -471,14 +360,15 @@ void testScheduleSweep() {
     for (omp_sched_t kind : kinds) {
         for (int chunk : chunks) {
             omp_set_schedule(kind, chunk);
-            ComplexField field = original;
-            fft.forward(field);
-            fft.inverse(field);
-
-            for (size_t r = 0; r < M; ++r) {
-                for (size_t c = 0; c < N; ++c) {
-                    double err = std::abs(field.at(r, c) - original.at(r, c));
-                    assert(err < TOLERANCE);
+            for (int layout : {Fft2D::LAYOUT_INPLACE, Fft2D::LAYOUT_STOCKHAM}) {
+                ComplexField field = original;
+                fft.forward(field, layout);
+                for (size_t i = 0; i < field.size(); ++i) {
+                    assert(std::abs(field.data()[i] - reference.data()[i]) < TOLERANCE);
+                }
+                fft.inverse(field, layout);
+                for (size_t i = 0; i < field.size(); ++i) {
+                    assert(std::abs(field.data()[i] - original.data()[i]) < TOLERANCE);
                 }
             }
         }
@@ -493,14 +383,10 @@ void testThreadScalabilityBothPasses() {
     // Comparar también los espectros evita depender únicamente de la ida y
     // vuelta. La referencia usa el mismo código con un hilo, como pide el lab.
     std::cout << "[Test 10] Invariancia numérica en directa E inversa con ambos layouts (1 vs 2, 4, 8 hilos)... ";
-    const size_t M = 16;
-    const size_t N = 16;
+    const size_t M = 128;
+    const size_t N = 64;
     ComplexField original(M, N);
-    for (size_t r = 0; r < M; ++r) {
-        for (size_t c = 0; c < N; ++c) {
-            original.at(r, c) = std::complex<double>(r * 0.7, c * 0.3);
-        }
-    }
+    original.fillRandom(42);
 
     Fft2D fft;
 
@@ -644,6 +530,9 @@ void testPartialPassesAndDegenerateDimensions() {
 
 int main() {
     const int original_threads = omp_get_max_threads();
+    const int original_dynamic = omp_get_dynamic();
+    // Solicitar realmente 1, 2, 4 y 8 hilos en las comparaciones de la suite.
+    omp_set_dynamic(0);
 
     std::cout << "==========================================================" << std::endl;
     std::cout << " (FFT/IFFT 2D, Tolerancia Unificada 1e-10, Referencia Ec1)" << std::endl;
@@ -668,6 +557,7 @@ int main() {
 
     // Restaurar estado global de hilos OpenMP
     omp_set_num_threads(original_threads);
+    omp_set_dynamic(original_dynamic);
 
     std::cout << "\n>>> TODAS LAS PRUEBAS (12/12) PASARON! <<<" << std::endl;
     return 0;
