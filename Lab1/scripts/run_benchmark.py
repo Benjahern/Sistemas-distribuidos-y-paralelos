@@ -35,7 +35,7 @@ def main():
     if binary_hash != sha256(executable) or any(sha256(root / path) != digest
                                                for path, digest in source_hashes.items()):
         raise RuntimeError("El binario o las fuentes cambiaron durante la campaña; repetirla")
-    tables = ("benchmark results.dat", "scaling analysis.dat", "roundtrip error.dat", "spectrum.dat")
+    tables = ("benchmark_results.dat", "scaling_analysis.dat", "roundtrip_error.dat", "spectrum.dat")
     manifest = {
         "started_utc": started,
         "finished_utc": datetime.now(timezone.utc).isoformat(),

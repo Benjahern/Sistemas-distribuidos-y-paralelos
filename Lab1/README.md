@@ -180,12 +180,12 @@ En `--output` (por defecto `results/`), con **espacios en los nombres**:
 
 | Archivo | Contenido |
 |---|---|
-| `benchmark results.dat` | Tamaño, layout, schedule, chunk, hilos solicitados/reales, repeticiones, promedio/desviación, RMSE, Parseval |
-| `scaling analysis.dat` | Speedup/eficiencia e incertidumbres, `f`, Amdahl, residual y ajuste acotado |
-| `performance plots.png` | Seis paneles: speedup, eficiencia, tiempo/chunk, tiempos de layouts, Amdahl y RMSE |
+| `benchmark_results.dat` | Tamaño, layout, schedule, chunk, hilos solicitados/reales, repeticiones, promedio/desviación, RMSE, Parseval |
+| `scaling_analysis.dat` | Speedup/eficiencia e incertidumbres, `f`, Amdahl, residual y ajuste acotado |
+| `performance_plots.png` | Seis paneles: speedup, eficiencia, tiempo/chunk, tiempos de layouts, Amdahl y RMSE |
 | `spectrum.dat` | `k l abs(X[k,l])`, orden natural, escala lineal |
 | `spectrum.png` | Séptimo gráfico: módulo de un seno 2D conocido |
-| `roundtrip error.dat` | RMSE y error relativo de Parseval por configuración |
+| `roundtrip_error.dat` | RMSE y error relativo de Parseval por configuración |
 | `benchmark_manifest.json` | Procedencia verificable de una ejecución de `make benchmark` |
 
 Cada tabla incluye una cabecera con las columnas. Layout `0=in-place`, `1=Stockham`;

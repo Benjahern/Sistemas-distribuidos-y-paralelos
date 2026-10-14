@@ -22,9 +22,9 @@ def load(path, columns):
 
 
 def performance(directory):
-    times = load(directory / "benchmark results.dat", 12)
-    scaling = load(directory / "scaling analysis.dat", 14)
-    errors = load(directory / "roundtrip error.dat", 8)
+    times = load(directory / "benchmark_results.dat", 12)
+    scaling = load(directory / "scaling_analysis.dat", 14)
+    errors = load(directory / "roundtrip_error.dat", 8)
     if not np.isfinite(times).all() or not np.isfinite(errors).all():
         raise ValueError("Tiempos o errores no finitos")
     fig, axes = plt.subplots(2, 3, figsize=(19, 11), constrained_layout=True)
@@ -99,10 +99,10 @@ def performance(directory):
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=7)
     fig.suptitle("FFT directa completa; barras: desviación estándar / incertidumbre propagada")
-    fig.savefig(directory / "performance plots.png", dpi=160,
-                metadata={"TimingSHA256": hashlib.sha256((directory / "benchmark results.dat").read_bytes()).hexdigest(),
-                          "ScalingSHA256": hashlib.sha256((directory / "scaling analysis.dat").read_bytes()).hexdigest(),
-                          "ErrorsSHA256": hashlib.sha256((directory / "roundtrip error.dat").read_bytes()).hexdigest()})
+    fig.savefig(directory / "performance_plots.png", dpi=160,
+                metadata={"TimingSHA256": hashlib.sha256((directory / "benchmark_results.dat").read_bytes()).hexdigest(),
+                          "ScalingSHA256": hashlib.sha256((directory / "scaling_analysis.dat").read_bytes()).hexdigest(),
+                          "ErrorsSHA256": hashlib.sha256((directory / "roundtrip_error.dat").read_bytes()).hexdigest()})
     plt.close(fig)
 
 
@@ -140,7 +140,7 @@ def main():
     parser.add_argument("--spectrum-scale", choices=("linear", "log"), default="linear")
     args = parser.parse_args()
     try:
-        if (args.input / "benchmark results.dat").exists():
+        if (args.input / "benchmark_results.dat").exists():
             performance(args.input)
         spectrum(args.input, args.spectrum_scale)
     except (OSError, ValueError) as error:
