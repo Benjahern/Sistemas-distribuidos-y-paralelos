@@ -1,0 +1,68 @@
+{
+  "started_utc": "2026-10-22T19:09:31.176470+00:00",
+  "finished_utc": "2026-10-22T19:09:44.680804+00:00",
+  "command": [
+    "/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/build-xi/fft2d",
+    "benchmark",
+    "--min-size",
+    "128",
+    "--max-size",
+    "1024",
+    "--chunk-grid",
+    "256",
+    "--threads",
+    "1,2,4,8",
+    "--repetitions",
+    "10",
+    "--seed",
+    "42",
+    "--memory-mib",
+    "4096",
+    "--output",
+    "/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/resultados-xi/1310102"
+  ],
+  "executable_sha256": "226f8499b4fa7b86fa803a094a190fbbbd9f70cb18d9ee25cd6762c49c9e88d0",
+  "source_sha256": {
+    "Makefile": "4a552ad622d5cbe94c6708edf43260a932f842c5cf57fe4e0c74194b9784d7fa",
+    "include/Benchmark.h": "43b4f46bda320101013f5ac9c5f333f7e9dab121cba5d49b6bad91d9e5df1f04",
+    "include/Butterfly1D.h": "45ba3c75b9ca99cf1029a9b415f37f3202a9e7ee5f8e3eb4bec752ede52325f8",
+    "include/ComplexField.h": "81970ef21e354710c5863ed6aeb5caf68807eb8a4f8329ac50947ec54b81681c",
+    "include/Fft2D.h": "df58e4d667dcd5a221231f1fef895bd8a1bd8d494d857844c1a8cdbe6f2a144e",
+    "include/SpectrumMetrics.h": "14439c1b93e45213853dd70c8ca3192dde9d272b9b67125000c5b37ddb3658f1",
+    "include/Visualizer.h": "877e117cda2e0d8e55cc2d3d927dd52d78aba8c013eb54d331dcc2c0205f4603",
+    "scripts/run_benchmark.py": "e6457f57136d3aa9ced0dbaf4a1ac5b33492fd97ff72ca2204cf4b982bddebe0",
+    "src/Benchmark.cpp": "5fc359bb175f67009aecffde950145e34023b71f567c9c034c8063ba73697b18",
+    "src/Butterfly1D.cpp": "6d5a78fa77a256d8fad74258546859dd1a0b72b5ed33c2dd1ee186e446f2e64d",
+    "src/ComplexField.cpp": "d2457d46b09ae53e5ce92e760d5c3525cec0a482e041bb0d470b7a6c889e4a70",
+    "src/Fft2D.cpp": "9f2232c535cf7e3f7784f31412f2d3f45004e1495b2eacb45947134356f8b4e1",
+    "src/SpectrumMetrics.cpp": "5e189dba3d392ae7911082ae37cff03606fc00c403a73a74863e02dbaeaf082e",
+    "src/Visualizer.cpp": "e24c0785346c026c4f2c56a690a098fcfa412b0ccb7f3cee146028155eaa93a2",
+    "src/main.cpp": "cc19372b278e47a94e88358ed564f474b934c931c6b5b04c7e40da8126d02b35"
+  },
+  "data_sha256": {
+    "benchmark_results.dat": "1af9d0b0b3167aa90afb98f56a1a2fa423818bd0e2f3007d4aa60611ad751d5f",
+    "scaling_analysis.dat": "afa88d8e165bacb48ad042ebbe19360862c862a19a3a200bfdee28e2686f1793",
+    "roundtrip_error.dat": "2cfdc6224fa1a47a67b3e3c10a315c1e0bd1df8d2640dcc4470049883e477390",
+    "spectrum.dat": "b1bae5bff9f3a29348f188852902e18a9e61514a152446a341775804020c58bd"
+  },
+  "platform": "Linux-5.19.0-1010-nvidia-lowlatency-x86_64-with-glibc2.35",
+  "logical_cpus": 128,
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "openmp_environment": {
+    "OMP_DYNAMIC": "false",
+    "OMP_PLACES": "cores",
+    "OMP_PROC_BIND": "close",
+    "OMP_MAX_ACTIVE_LEVELS": "1",
+    "OMP_NUM_THREADS": "8"
+  },
+  "measurement": "FFT 2D directa completa; calentamiento y restauraci\u00f3n fuera del cron\u00f3metro"
+}

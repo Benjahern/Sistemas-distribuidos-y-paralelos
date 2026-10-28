@@ -4,3 +4,7 @@ build/
 *.d
 Lab1/build/
 Lab1/fft2d
+
+# Imagenes locales de contenedores
+/Lab1/fft-bench-lab1.tar
+/Lab1/fft-rootfs.tar
