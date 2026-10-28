@@ -1,0 +1,208 @@
+CPU disponibles: 96
+make: Nothing to be done for 'all'.
+OMP_NUM_THREADS=4 "/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/build-xi/test_butterfly1d"
+=== PRUEBAS DE UNIDAD ROL 2 (Butterfly1D) ===
+[Test 1] Impulso N=4 (Cooley-Tukey vs Stockham)... PASSED
+[Test 2] Equivalencia N=8 en datos aleatorios... PASSED
+[Test 3] Contrato sin escala en 1D: IFFT(FFT(x)) == N * x... PASSED
+[Test 4] Prueba de Schedules (Static, Dynamic, Guided) y Chunks... PASSED
+[Test 5] Cláusulas OpenMP (initTwiddlesSingle, accumulateFirstprivate, stageIndexLastprivate)... PASSED
+[Test 6] Senoide 1D de 1 período (Forma cerrada analítica)... PASSED
+[Test 7] Tamaños grandes (N=64, 256, 1024)... PASSED
+[Test 8] Invariancia ante hilos OpenMP (1 vs 8 hilos)... PASSED
+[Test 9] Casos borde (N=1 y N=2)... PASSED
+[Test 10] Transformada inversa 1D directa en ambos layouts... PASSED
+=== TODAS LAS 10 PRUEBAS DE ROL 2 PASARON EXITOSAMENTE ===
+OMP_NUM_THREADS=4 "/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/build-xi/test_fft2d"
+==========================================================
+ (FFT/IFFT 2D, Tolerancia Unificada 1e-10, Referencia Ec1)
+ Hilos OpenMP disponibles: 4
+==========================================================
+Layout 0
+[Test 1] Impulso 2x2 analítico y su IFFT... PASÓ OK!
+[Test 3] Exponencial compleja pura (verificación estricta de signo twiddle)... PASÓ OK! (Pico único de magnitud 256 en (3, 5))
+[Test 4] Seno 2D: magnitud exacta M*N/2 y bins nulos... PASÓ OK! (Picos en (2,3) y (14,13))
+[Test 5] Teorema de Parseval en grilla 8x8 con semilla fija... PASÓ OK! (Diferencia relativa: 4.40526e-16)
+Layout 1
+[Test 1] Impulso 2x2 analítico y su IFFT... PASÓ OK!
+[Test 3] Exponencial compleja pura (verificación estricta de signo twiddle)... PASÓ OK! (Pico único de magnitud 256 en (3, 5))
+[Test 4] Seno 2D: magnitud exacta M*N/2 y bins nulos... PASÓ OK! (Picos en (2,3) y (14,13))
+[Test 5] Teorema de Parseval en grilla 8x8 con semilla fija... PASÓ OK! (Diferencia relativa: 2.93684e-16)
+[Test 2] Comparación contra DFT 2D ingenua (Ec. 1) en 8x4 Y 4x8... PASÓ OK!
+[Test 6] Ida y vuelta exhaustiva (dimensiones, layouts e hilos)... PASÓ OK!
+[Test 7] Instancia enlazada Fft2D(field) en 4x8 y 8x4 con ambos layouts... PASÓ OK!
+[Test 8] Comparación OpenMP parallel for vs task (con y sin single)... PASÓ OK!
+[Test 9] Barrido de OpenMP schedule(runtime) (static, dynamic, guided)... PASÓ OK!
+[Test 10] Invariancia numérica en directa E inversa con ambos layouts (1 vs 2, 4, 8 hilos)... PASÓ OK!
+[Test 11] Robustez y manejo de excepciones (incluyendo pasadas individuales)... PASÓ OK!
+[Test 12] Pasadas individuales, escala y grillas 1x1, 1x8, 8x1, 4x8... PASÓ OK!
+
+>>> TODAS LAS PRUEBAS (12/12) PASARON! <<<
+OMP_NUM_THREADS=4 "/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/build-xi/test_fft2d_integration"
+==========================================================
+ (FFT/IFFT 2D, Tolerancia Unificada 1e-10, Referencia Ec1)
+ Hilos OpenMP disponibles: 4
+==========================================================
+Layout 0
+[Test 1] Impulso 2x2 analítico y su IFFT... PASÓ OK!
+[Test 3] Exponencial compleja pura (verificación estricta de signo twiddle)... PASÓ OK! (Pico único de magnitud 256 en (3, 5))
+[Test 4] Seno 2D: magnitud exacta M*N/2 y bins nulos... PASÓ OK! (Picos en (2,3) y (14,13))
+[Test 5] Teorema de Parseval en grilla 8x8 con semilla fija... PASÓ OK! (Diferencia relativa: 2.93684e-16)
+Layout 1
+[Test 1] Impulso 2x2 analítico y su IFFT... PASÓ OK!
+[Test 3] Exponencial compleja pura (verificación estricta de signo twiddle)... PASÓ OK! (Pico único de magnitud 256 en (3, 5))
+[Test 4] Seno 2D: magnitud exacta M*N/2 y bins nulos... PASÓ OK! (Picos en (2,3) y (14,13))
+[Test 5] Teorema de Parseval en grilla 8x8 con semilla fija... PASÓ OK! (Diferencia relativa: 2.93684e-16)
+[Test 2] Comparación contra DFT 2D ingenua (Ec. 1) en 8x4 Y 4x8... PASÓ OK!
+[Test 6] Ida y vuelta exhaustiva (dimensiones, layouts e hilos)... PASÓ OK!
+[Test 7] Instancia enlazada Fft2D(field) en 4x8 y 8x4 con ambos layouts... PASÓ OK!
+[Test 8] Comparación OpenMP parallel for vs task (con y sin single)... PASÓ OK!
+[Test 9] Barrido de OpenMP schedule(runtime) (static, dynamic, guided)... PASÓ OK!
+[Test 10] Invariancia numérica en directa E inversa con ambos layouts (1 vs 2, 4, 8 hilos)... PASÓ OK!
+[Test 11] Robustez y manejo de excepciones (incluyendo pasadas individuales)... PASÓ OK!
+[Test 12] Pasadas individuales, escala y grillas 1x1, 1x8, 8x1, 4x8... PASÓ OK!
+
+>>> TODAS LAS PRUEBAS (12/12) PASARON! <<<
+"/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/build-xi/test_complexfield"
+ComplexField: TODAS LAS PRUEBAS PASARON
+"/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/build-xi/test_metrics_benchmark"
+4x4 layout=0 schedule=0 chunk=0 p=1 T=7.3372e-06 +/- 2.02293e-07 s
+4x4 layout=0 schedule=0 chunk=0 p=2 T=4.81412e-06 +/- 3.39616e-07 s
+4x4 layout=1 schedule=0 chunk=0 p=1 T=7.07421e-06 +/- 2.78494e-08 s
+4x4 layout=1 schedule=0 chunk=0 p=2 T=4.6821e-06 +/- 3.15568e-08 s
+8x8 layout=0 schedule=0 chunk=0 p=1 T=2.15105e-05 +/- 1.20293e-07 s
+8x8 layout=0 schedule=0 chunk=0 p=2 T=1.73025e-05 +/- 1.22874e-05 s
+8x8 layout=1 schedule=0 chunk=0 p=1 T=2.06635e-05 +/- 6.13122e-08 s
+8x8 layout=1 schedule=0 chunk=0 p=2 T=1.28933e-05 +/- 7.52464e-08 s
+8x8 layout=0 schedule=0 chunk=1 p=1 T=2.17486e-05 +/- 7.5089e-08 s
+8x8 layout=0 schedule=0 chunk=1 p=2 T=1.41503e-05 +/- 2.06737e-06 s
+8x8 layout=0 schedule=0 chunk=2 p=1 T=2.14326e-05 +/- 1.16655e-07 s
+8x8 layout=0 schedule=0 chunk=2 p=2 T=1.35364e-05 +/- 1.06716e-07 s
+8x8 layout=0 schedule=1 chunk=1 p=1 T=2.14665e-05 +/- 5.22654e-08 s
+8x8 layout=0 schedule=1 chunk=1 p=2 T=1.34244e-05 +/- 8.053e-08 s
+8x8 layout=0 schedule=1 chunk=2 p=1 T=2.23226e-05 +/- 2.18984e-06 s
+8x8 layout=0 schedule=1 chunk=2 p=2 T=1.34823e-05 +/- 9.23234e-08 s
+8x8 layout=0 schedule=2 chunk=1 p=1 T=2.13936e-05 +/- 5.09789e-08 s
+8x8 layout=0 schedule=2 chunk=1 p=2 T=1.37024e-05 +/- 4.71346e-08 s
+8x8 layout=0 schedule=2 chunk=2 p=1 T=2.23166e-05 +/- 1.54298e-06 s
+8x8 layout=0 schedule=2 chunk=2 p=2 T=1.37183e-05 +/- 5.29509e-08 s
+8x8 layout=1 schedule=0 chunk=1 p=1 T=2.04386e-05 +/- 8.24743e-08 s
+8x8 layout=1 schedule=0 chunk=1 p=2 T=1.32653e-05 +/- 5.4585e-08 s
+8x8 layout=1 schedule=0 chunk=2 p=1 T=2.04545e-05 +/- 8.67447e-08 s
+8x8 layout=1 schedule=0 chunk=2 p=2 T=1.35184e-05 +/- 9.80209e-07 s
+8x8 layout=1 schedule=1 chunk=1 p=1 T=2.06105e-05 +/- 8.60489e-08 s
+8x8 layout=1 schedule=1 chunk=1 p=2 T=1.32134e-05 +/- 5.63912e-08 s
+8x8 layout=1 schedule=1 chunk=2 p=1 T=2.06115e-05 +/- 8.12052e-08 s
+8x8 layout=1 schedule=1 chunk=2 p=2 T=1.31864e-05 +/- 5.77786e-08 s
+8x8 layout=1 schedule=2 chunk=1 p=1 T=2.11385e-05 +/- 2.11326e-06 s
+8x8 layout=1 schedule=2 chunk=1 p=2 T=1.32184e-05 +/- 5.62123e-08 s
+8x8 layout=1 schedule=2 chunk=2 p=1 T=2.05585e-05 +/- 5.06936e-08 s
+8x8 layout=1 schedule=2 chunk=2 p=2 T=1.31653e-05 +/- 5.78464e-08 s
+Métricas, estadística, Amdahl, barreras y exportación: OK
+FFT_EXECUTABLE="/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/build-xi/fft2d" FFT_TEST_DIR="/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/build-xi" python3 tests/test_outputs.py
+python3 scripts/run_benchmark.py --executable "/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/build-xi/fft2d" --output "/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/resultados-xi/1310166" -- --min-size 2048 --max-size 2048 --chunk-grid 2048 --threads 1,2,4,8,16,32,64,96 --repetitions 10 --seed 42 --memory-mib 8192
+2048x2048 layout=0 schedule=0 chunk=0 p=1 T=0.9635780813 +/- 0.002326995875 s
+2048x2048 layout=0 schedule=0 chunk=0 p=2 T=0.7254850028 +/- 0.006534676994 s
+2048x2048 layout=0 schedule=0 chunk=0 p=4 T=0.3655165411 +/- 0.002281218626 s
+2048x2048 layout=0 schedule=0 chunk=0 p=8 T=0.1859786758 +/- 0.00164793094 s
+2048x2048 layout=0 schedule=0 chunk=0 p=16 T=0.09483313293 +/- 0.001027067182 s
+2048x2048 layout=0 schedule=0 chunk=0 p=32 T=0.0506656504 +/- 0.002994894827 s
+2048x2048 layout=0 schedule=0 chunk=0 p=64 T=0.02844046309 +/- 0.0005214309757 s
+2048x2048 layout=0 schedule=0 chunk=0 p=96 T=0.02035808568 +/- 0.0008803629077 s
+2048x2048 layout=1 schedule=0 chunk=0 p=1 T=0.2918311749 +/- 0.0005242594657 s
+2048x2048 layout=1 schedule=0 chunk=0 p=2 T=0.221819369 +/- 0.0008095989631 s
+2048x2048 layout=1 schedule=0 chunk=0 p=4 T=0.1111891139 +/- 0.000205856902 s
+2048x2048 layout=1 schedule=0 chunk=0 p=8 T=0.05680818999 +/- 0.0003135764747 s
+2048x2048 layout=1 schedule=0 chunk=0 p=16 T=0.02979543621 +/- 0.0002991449496 s
+2048x2048 layout=1 schedule=0 chunk=0 p=32 T=0.01628711409 +/- 0.001052205973 s
+2048x2048 layout=1 schedule=0 chunk=0 p=64 T=0.01009594301 +/- 0.002127755969 s
+2048x2048 layout=1 schedule=0 chunk=0 p=96 T=0.007705535414 +/- 0.001836647537 s
+2048x2048 layout=0 schedule=0 chunk=1 p=1 T=0.9665403891 +/- 0.001623645055 s
+2048x2048 layout=0 schedule=0 chunk=1 p=96 T=0.07016234068 +/- 0.1582732386 s
+2048x2048 layout=0 schedule=0 chunk=2 p=1 T=0.9694768324 +/- 0.00151064185 s
+2048x2048 layout=0 schedule=0 chunk=2 p=96 T=0.02041717211 +/- 0.001167057284 s
+2048x2048 layout=0 schedule=0 chunk=4 p=1 T=0.9686797164 +/- 0.001368082053 s
+2048x2048 layout=0 schedule=0 chunk=4 p=96 T=0.02215672038 +/- 0.001399608428 s
+2048x2048 layout=0 schedule=0 chunk=8 p=1 T=0.9677001541 +/- 0.001128045518 s
+2048x2048 layout=0 schedule=0 chunk=8 p=96 T=0.02314947241 +/- 0.001257840896 s
+2048x2048 layout=0 schedule=0 chunk=16 p=1 T=0.9681110883 +/- 0.001581658191 s
+2048x2048 layout=0 schedule=0 chunk=16 p=96 T=0.02804946051 +/- 0.0002768412382 s
+2048x2048 layout=0 schedule=0 chunk=32 p=1 T=0.9670855707 +/- 0.001624122779 s
+2048x2048 layout=0 schedule=0 chunk=32 p=96 T=0.02819652332 +/- 0.0004038124375 s
+2048x2048 layout=0 schedule=0 chunk=64 p=1 T=0.9691352539 +/- 0.001237835618 s
+2048x2048 layout=0 schedule=0 chunk=64 p=96 T=0.0498078121 +/- 0.0005357490874 s
+2048x2048 layout=0 schedule=1 chunk=1 p=1 T=0.9686197069 +/- 0.001430499386 s
+2048x2048 layout=0 schedule=1 chunk=1 p=96 T=0.02099136662 +/- 0.001246106097 s
+2048x2048 layout=0 schedule=1 chunk=2 p=1 T=0.9696298124 +/- 0.001638556535 s
+2048x2048 layout=0 schedule=1 chunk=2 p=96 T=0.02075079167 +/- 0.001212288138 s
+2048x2048 layout=0 schedule=1 chunk=4 p=1 T=0.9707084012 +/- 0.001409414061 s
+2048x2048 layout=0 schedule=1 chunk=4 p=96 T=0.02066759709 +/- 0.0004919780677 s
+2048x2048 layout=0 schedule=1 chunk=8 p=1 T=0.9676141279 +/- 0.0009337559342 s
+2048x2048 layout=0 schedule=1 chunk=8 p=96 T=0.02085505991 +/- 0.0007261291627 s
+2048x2048 layout=0 schedule=1 chunk=16 p=1 T=0.9681127181 +/- 0.001805691794 s
+2048x2048 layout=0 schedule=1 chunk=16 p=96 T=0.02655985471 +/- 0.0009621578541 s
+2048x2048 layout=0 schedule=1 chunk=32 p=1 T=0.9700335446 +/- 0.003008040718 s
+2048x2048 layout=0 schedule=1 chunk=32 p=96 T=0.02751329897 +/- 0.001091717163 s
+2048x2048 layout=0 schedule=1 chunk=64 p=1 T=0.9707501631 +/- 0.002345210313 s
+2048x2048 layout=0 schedule=1 chunk=64 p=96 T=0.05407356559 +/- 0.003193200505 s
+2048x2048 layout=0 schedule=2 chunk=1 p=1 T=0.9693662169 +/- 0.001061662188 s
+2048x2048 layout=0 schedule=2 chunk=1 p=96 T=0.01896102901 +/- 0.0005282961907 s
+2048x2048 layout=0 schedule=2 chunk=2 p=1 T=0.9673212166 +/- 0.001459675055 s
+2048x2048 layout=0 schedule=2 chunk=2 p=96 T=0.01912318489 +/- 0.0004791752853 s
+2048x2048 layout=0 schedule=2 chunk=4 p=1 T=0.9674058308 +/- 0.001369537502 s
+2048x2048 layout=0 schedule=2 chunk=4 p=96 T=0.01933891139 +/- 7.550304301e-05 s
+2048x2048 layout=0 schedule=2 chunk=8 p=1 T=0.9668020396 +/- 0.001093816977 s
+2048x2048 layout=0 schedule=2 chunk=8 p=96 T=0.02136628929 +/- 0.0005242334117 s
+2048x2048 layout=0 schedule=2 chunk=16 p=1 T=0.9677165223 +/- 0.001573326553 s
+2048x2048 layout=0 schedule=2 chunk=16 p=96 T=0.02619340749 +/- 0.0009036384853 s
+2048x2048 layout=0 schedule=2 chunk=32 p=1 T=0.9695470864 +/- 0.001466171023 s
+2048x2048 layout=0 schedule=2 chunk=32 p=96 T=0.02776498831 +/- 0.002183269392 s
+2048x2048 layout=0 schedule=2 chunk=64 p=1 T=0.9703262327 +/- 0.0009847959782 s
+2048x2048 layout=0 schedule=2 chunk=64 p=96 T=0.05411429041 +/- 0.004000162864 s
+2048x2048 layout=1 schedule=0 chunk=1 p=1 T=0.2917603004 +/- 0.000165149851 s
+2048x2048 layout=1 schedule=0 chunk=1 p=96 T=0.007690449513 +/- 0.0004266588238 s
+2048x2048 layout=1 schedule=0 chunk=2 p=1 T=0.2917855202 +/- 0.0001747661247 s
+2048x2048 layout=1 schedule=0 chunk=2 p=96 T=0.007168830896 +/- 0.0001799326288 s
+2048x2048 layout=1 schedule=0 chunk=4 p=1 T=0.2919690906 +/- 0.0001576732592 s
+2048x2048 layout=1 schedule=0 chunk=4 p=96 T=0.007749462291 +/- 0.0001043746145 s
+2048x2048 layout=1 schedule=0 chunk=8 p=1 T=0.2921419673 +/- 0.0004071147214 s
+2048x2048 layout=1 schedule=0 chunk=8 p=96 T=0.007573320204 +/- 7.150078118e-05 s
+2048x2048 layout=1 schedule=0 chunk=16 p=1 T=0.2919996344 +/- 0.0002063237447 s
+2048x2048 layout=1 schedule=0 chunk=16 p=96 T=0.009439718397 +/- 0.0006091982427 s
+2048x2048 layout=1 schedule=0 chunk=32 p=1 T=0.2915464406 +/- 0.0002482688872 s
+2048x2048 layout=1 schedule=0 chunk=32 p=96 T=0.009532140929 +/- 9.694864538e-05 s
+2048x2048 layout=1 schedule=0 chunk=64 p=1 T=0.2926248474 +/- 0.0005940779571 s
+2048x2048 layout=1 schedule=0 chunk=64 p=96 T=0.0159049481 +/- 0.000208287785 s
+2048x2048 layout=1 schedule=1 chunk=1 p=1 T=0.2940279678 +/- 0.001037398543 s
+2048x2048 layout=1 schedule=1 chunk=1 p=96 T=0.009630694159 +/- 0.0001794349246 s
+2048x2048 layout=1 schedule=1 chunk=2 p=1 T=0.2920218771 +/- 0.0002619335509 s
+2048x2048 layout=1 schedule=1 chunk=2 p=96 T=0.008604426368 +/- 0.0001391845977 s
+2048x2048 layout=1 schedule=1 chunk=4 p=1 T=0.2919172073 +/- 0.0003687354513 s
+2048x2048 layout=1 schedule=1 chunk=4 p=96 T=0.007300801389 +/- 0.0004443242614 s
+2048x2048 layout=1 schedule=1 chunk=8 p=1 T=0.2945417306 +/- 0.0002756835879 s
+2048x2048 layout=1 schedule=1 chunk=8 p=96 T=0.007590769802 +/- 8.447166027e-05 s
+2048x2048 layout=1 schedule=1 chunk=16 p=1 T=0.2918690878 +/- 0.0002490496226 s
+2048x2048 layout=1 schedule=1 chunk=16 p=96 T=0.008854128525 +/- 6.12271503e-05 s
+2048x2048 layout=1 schedule=1 chunk=32 p=1 T=0.2919830229 +/- 0.0002945198342 s
+2048x2048 layout=1 schedule=1 chunk=32 p=96 T=0.009391613712 +/- 0.0001769692758 s
+2048x2048 layout=1 schedule=1 chunk=64 p=1 T=0.2948199531 +/- 0.0002849105582 s
+2048x2048 layout=1 schedule=1 chunk=64 p=96 T=0.01749387501 +/- 0.00165767233 s
+2048x2048 layout=1 schedule=2 chunk=1 p=1 T=0.2918063568 +/- 0.0001634296178 s
+2048x2048 layout=1 schedule=2 chunk=1 p=96 T=0.006687332131 +/- 0.0002519991421 s
+2048x2048 layout=1 schedule=2 chunk=2 p=1 T=0.2923423392 +/- 0.0003002299269 s
+2048x2048 layout=1 schedule=2 chunk=2 p=96 T=0.006763212406 +/- 0.0001994601801 s
+2048x2048 layout=1 schedule=2 chunk=4 p=1 T=0.294569729 +/- 0.0003739138978 s
+2048x2048 layout=1 schedule=2 chunk=4 p=96 T=0.006654924294 +/- 0.0002195259989 s
+2048x2048 layout=1 schedule=2 chunk=8 p=1 T=0.2920380524 +/- 0.0002418199895 s
+2048x2048 layout=1 schedule=2 chunk=8 p=96 T=0.007318834192 +/- 0.0003026344228 s
+2048x2048 layout=1 schedule=2 chunk=16 p=1 T=0.2919122539 +/- 0.0001948515459 s
+2048x2048 layout=1 schedule=2 chunk=16 p=96 T=0.008794843813 +/- 0.0001186831281 s
+2048x2048 layout=1 schedule=2 chunk=32 p=1 T=0.2953673385 +/- 0.0035688013 s
+2048x2048 layout=1 schedule=2 chunk=32 p=96 T=0.009447812394 +/- 0.0003311428951 s
+2048x2048 layout=1 schedule=2 chunk=64 p=1 T=0.2921503317 +/- 0.0002446676322 s
+2048x2048 layout=1 schedule=2 chunk=64 p=96 T=0.01616512241 +/- 0.0004352815503 s
+Seno 2D: picos (1,1) y (63,63), módulo esperado=2048, observado=2048 (escala lineal)
+Datos guardados en /home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/resultados-xi/1310166. Para PNG, ejecutar scripts/plot_results.py.
+Procedencia guardada en /home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/resultados-xi/1310166/benchmark_manifest.json
+python3 scripts/plot_results.py --input "/home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/resultados-xi/1310166"
+Figuras guardadas en /home/ceph/bhernandez/Sistemas-distribuidos-y-paralelos/Lab1/resultados-xi/1310166

@@ -1,0 +1,6 @@
+cpu-bind=MASK - xicpu02, task  0  0 [112295]: mask 0xffffffffffff0000ffffffffffff set
+..
+----------------------------------------------------------------------
+Ran 2 tests in 1.778s
+
+OK

@@ -1,0 +1,77 @@
+xicpu02
+mié 28 oct 2026 01:58:51 UTC
+f69ec2bad594389a6f0f2ef01fcaf7a51b952ef9
+?? benchmark-126-8192.slurm
+?? benchmark-126.slurm
+?? benchmark-64.slurm
+?? benchmark-96-8192.slurm
+?? benchmark-96.slurm
+?? benchmark-chunks-126.slurm
+?? benchmark-chunks-96.slurm
+?? benchmark-nativo.slurm
+?? build-xi/
+?? chunk126-1310167.err
+?? chunk126-1310167.out
+?? chunk96-1310166.err
+?? chunk96-1310166.out
+?? fft-1310097.err
+?? fft-1310097.out
+?? fft-1310101.err
+?? fft-1310101.out
+?? fft-1310102.err
+?? fft-1310102.out
+?? fft126-1310163.err
+?? fft126-1310163.out
+?? fft126-1310165.err
+?? fft126-1310165.out
+?? fft64-1310107.err
+?? fft64-1310107.out
+?? fft96-1310111.err
+?? fft96-1310111.out
+?? fft96-1310164.err
+?? fft96-1310164.out
+?? resultados-xi/
+g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Architecture:                    x86_64
+CPU op-mode(s):                  32-bit, 64-bit
+Address sizes:                   48 bits physical, 48 bits virtual
+Byte Order:                      Little Endian
+CPU(s):                          128
+On-line CPU(s) list:             0-127
+Vendor ID:                       AuthenticAMD
+Model name:                      AMD EPYC 7513 32-Core Processor
+CPU family:                      25
+Model:                           1
+Thread(s) per core:              2
+Core(s) per socket:              32
+Socket(s):                       2
+Stepping:                        1
+Frequency boost:                 enabled
+CPU max MHz:                     3681,6399
+CPU min MHz:                     1500,0000
+BogoMIPS:                        5200.04
+Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 invpcid_single hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin brs arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca
+Virtualization:                  AMD-V
+L1d cache:                       2 MiB (64 instances)
+L1i cache:                       2 MiB (64 instances)
+L2 cache:                        32 MiB (64 instances)
+L3 cache:                        256 MiB (8 instances)
+NUMA node(s):                    2
+NUMA node0 CPU(s):               0-31,64-95
+NUMA node1 CPU(s):               32-63,96-127
+Vulnerability Itlb multihit:     Not affected
+Vulnerability L1tf:              Not affected
+Vulnerability Mds:               Not affected
+Vulnerability Meltdown:          Not affected
+Vulnerability Mmio stale data:   Not affected
+Vulnerability Retbleed:          Not affected
+Vulnerability Spec store bypass: Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:        Mitigation; Retpolines, IBPB conditional, IBRS_FW, STIBP always-on, RSB filling, PBRSB-eIBRS Not affected
+Vulnerability Srbds:             Not affected
+Vulnerability Tsx async abort:   Not affected
+pid 116017's current affinity list: 0-62,64-126
