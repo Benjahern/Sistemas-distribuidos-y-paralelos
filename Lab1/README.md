@@ -60,10 +60,9 @@ No genera el reporte PDF ni sustituye el análisis de resultados.
 la configuración del CLI en el Makefile. Para personalizar demo, espectro o escala
 de los gráficos, usar directamente el ejecutable o el script, como se muestra abajo.
 
-`make test` ejecuta pruebas 1D, composición 2D con los módulos reales,
-modelo de datos, métricas, estadísticas, Amdahl, CLI y generación de PNG.
-`make test-role3` ejecuta la suite de FFT/IFFT 2D enlazada con `ComplexField` y
-`Butterfly1D`; `make test-integration` es un alias del mismo target.
+`make test` ejecuta pruebas 1D, composición 2D con sustitutos **y con los módulos
+reales**, modelo de datos, métricas, estadísticas, Amdahl, CLI y generación de PNG.
+`make test-role3` mantiene la suite aislada; `make test-integration` usa el núcleo real.
 `TEST_THREADS=4` controla el equipo inicial de las suites antiguas; estas también
 prueban explícitamente 1, 2, 4 y 8 hilos.
 
@@ -106,11 +105,47 @@ make plots
 
 # Ampliar incluyendo los procesadores lógicos disponibles (Linux):
 OMP_PROC_BIND=close OMP_PLACES=threads make benchmark OUTPUT=results/full \
-  BENCHMARK_ARGS="--min-size 128 --max-size 4096 --chunk-grid 256 --threads 1,2,4,8,$(nproc) --memory-mib 512"
+  BENCHMARK_ARGS="--min-size 128 --max-size 4096 --chunk-grid 256 --threads 1,2,4,8,$(nproc) --repetitions 10 --seed 42 --memory-mib 2048"
 
 # Regenerar figuras sin medir de nuevo:
 make plots OUTPUT=results/full
 ```
+
+El ejemplo ampliado reserva un presupuesto interno de 2048 MiB para permitir
+medir hasta `4096×4096`. Con 512 MiB, la cota conservadora del programa detiene
+esa serie antes de `4096×4096`.
+
+### Repetir las campañas del clúster
+
+Desde `Lab1/` en el clúster con Slurm y la partición `batch`, enviar cada campaña
+por separado y esperar a que finalice antes de iniciar otra medición en el mismo
+nodo. Los scripts compilan, ejecutan `make test`, miden y generan los gráficos.
+
+| Campaña | Envío a Slurm | Serie de tamaños | Grilla del barrido de chunks |
+|---|---|---|---|
+| 96 CPU, ampliación | `sbatch benchmark-96-8192.slurm` | 128 a 8192, duplicando el lado | `256×256` |
+| 126 CPU, ampliación | `sbatch benchmark-126-8192.slurm` | 128 a 8192, duplicando el lado | `256×256` |
+| 96 CPU, chunks | `sbatch benchmark-chunks-96.slurm` | `2048×2048` | `2048×2048` |
+| 126 CPU, chunks | `sbatch benchmark-chunks-126.slurm` | `2048×2048` | `2048×2048` |
+
+Las cuatro campañas usan diez repeticiones, semilla 42, ambos layouts y un
+presupuesto interno de 8192 MiB. Las de 96 CPU prueban
+`1,2,4,8,16,32,64,96` hilos; las de 126 añaden `126`. El barrido compara
+`static`, `dynamic` y `guided`, chunks `1,2,4,8,16,32,64`, con un hilo y con el
+máximo asignado. Las CPU asignadas son lógicas; el servidor de las mediciones
+tiene 64 núcleos físicos y 128 CPU lógicas.
+
+Los scripts fijan `OMP_DYNAMIC=false`, `OMP_PLACES=threads`,
+`OMP_PROC_BIND=close` y `OMP_MAX_ACTIVE_LEVELS=1`; solicitan 16 GiB a Slurm.
+`--time=02:00:00` es el límite de ejecución solicitado. La duración del benchmark
+se obtiene de `started_utc` y `finished_utc` en su manifiesto; no incluye la cola
+ni la compilación y las pruebas previas.
+
+Cada envío escribe en `resultados-xi/<SLURM_JOB_ID>/`, con su propio
+`benchmark_manifest.json` y `entorno.txt`. Los resultados analizados en el informe
+corresponden a los jobs 1310164 y 1310165 (ampliaciones) y 1310166 y 1310167
+(chunks), respectivamente. Un nuevo envío recibe otro identificador y puede
+producir tiempos diferentes aun con los mismos parámetros.
 
 `make benchmark` mide y escribe datos; `make plots` añade los PNG.
 También escribe `benchmark_manifest.json`: comando, fechas UTC, afinidad y entorno
@@ -177,7 +212,7 @@ compilaciones u otras cargas simultáneamente durante una campaña de rendimient
 
 ## Archivos y siete gráficos
 
-En `--output` (por defecto `results/`), con **espacios en los nombres**:
+En `--output` (por defecto `results/`), usando **guiones bajos** en los nombres compuestos:
 
 | Archivo | Contenido |
 |---|---|
@@ -216,23 +251,29 @@ para comprobar que ambos archivos corresponden a la misma exportación.
 
 ## Arquitectura, roles y OpenMP
 
-| Responsabilidad / rol de referencia | Módulos |
-|---|---|
-| 1: modelo y datos | `ComplexField.h/.cpp`: memoria row-major, semilla, campos `.dat` |
-| 2: núcleo 1D | `Butterfly1D.h/.cpp`: implementación original de `origin/feat/Mariposa`, ambos layouts |
-| 3: composición 2D | `Fft2D.h/.cpp`: filas, columnas y normalización |
-| 4: métricas y benchmarks | `SpectrumMetrics.h/.cpp`, `Benchmark.h/.cpp` |
-| 5: calidad y visualización | `Visualizer.h/.cpp`, `scripts/plot_results.py`, `tests/`, Docker/CI |
-| Integración | `src/main.cpp`: CLI y coordinación, sin copiar algoritmos |
+El equipo está integrado por Marco Ortiz, Mateo Valle, Nicolás Sarabia y
+Benjamín Hernández. La distribución coincide con el reporte técnico:
 
-Los nombres de integrantes y la distribución en un equipo de cuatro deben ser
-completados por el equipo; no se atribuyen responsables ficticios.
+| Rol | Responsable | Módulos e interfaces |
+|---|---|---|
+| 1: modelo y datos | Marco Ortiz | `ComplexField.h/.cpp`: grilla, memoria, bit-reversal, semilla e I/O `.dat` |
+| 2: núcleo mariposa 1D | Mateo Valle | `Butterfly1D.h/.cpp`: mariposa compartida, ambos layouts, twiddles, schedules y barreras |
+| 3: FFT e IFFT 2D | Nicolás Sarabia | `Fft2D.h/.cpp`: pasadas por filas/columnas, composición 2D y normalización |
+| 4: métricas y benchmarks | Benjamín Hernández | `SpectrumMetrics.h/.cpp`, `Benchmark.h/.cpp`: error, Parseval, tiempos y estadísticas |
+| 5: calidad, CI y visualización | Benjamín Hernández | `Visualizer.h/.cpp`, `scripts/plot_results.py`, `tests/`, Docker y CI |
+
+Benjamín Hernández cubre los roles 4 y 5 en este equipo de cuatro. Las interfaces
+se mantienen separadas: las métricas y el benchmark usan la API pública de
+`Fft2D` para obtener números y tablas; la visualización lee el espectro o las
+tablas y genera figuras. Las pruebas verifican esos módulos mediante sus
+interfaces. `src/main.cpp` coordina el CLI y delega en las clases, sin duplicar
+la lógica de la transformada.
 
 | Archivo / función | Cláusula | Justificación / ruta probada |
 |---|---|---|
 | `Fft2D.cpp`, `rowsPass`/`colsPass` | `parallel for`, `schedule(runtime)`, `shared` | Filas/columnas independientes; schedule y chunk configurables en benchmarks |
 | `Fft2D.cpp`, `forwardRows` | `task`, `single`, `taskwait`, `firstprivate(r)` | Tareas de filas con índice propio; comparadas con parallel for por la suite real |
-| `Fft2D.cpp`, `inverse` | `collapse(2)`, `schedule(static)` | Normalización de celdas independientes con costo uniforme y bloques contiguos |
+| `Fft2D.cpp`, `inverse` | `collapse(2)` | Normalización de celdas independientes |
 | `Butterfly1D.cpp`, `transformCooleyTukey` | `parallel for`, schedules, `barrier` | Barreras implícitas entre etapas; `transformStages` usa región persistente y barrera explícita |
 | `Butterfly1D.cpp`, `transformStockham` | `parallel for`, schedules, `collapse(2)` | Collapse solo parejas independientes de una etapa; barrera implícita antes del intercambio de buffers |
 | `Butterfly1D.cpp`, `initTwiddlesSingle` | `single` | Un productor de twiddles, probado por suite 1D |
@@ -269,5 +310,6 @@ requests hacia `main`/`develop` que afectan a `Lab1` o al workflow correspondien
 `docker.yml` construye la imagen, ejecuta explícitamente `make test` dentro del
 contenedor y luego la demo. CI no ejecuta una campaña de rendimiento independiente.
 
-El reporte técnico PDF y la asignación nominal de roles son entregables separados;
-esta implementación no los da por completados.
+El reporte técnico PDF se entrega junto al código, los tests, las tablas y las
+figuras. Al preparar el paquete, incluir también `.github/workflows/`, ubicado
+en la raíz del repositorio (un nivel sobre `Lab1/`), para conservar la CI.
