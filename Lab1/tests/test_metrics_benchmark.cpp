@@ -158,7 +158,7 @@ void testBenchmarkExports() {
     ComplexField sine(8, 4); sine.fillSine(1, 1); Fft2D().forward(sine);
     assert(std::abs(std::abs(sine.at(1, 1))-16) < 1e-10);
     Visualizer::writeSpectrum(sine, config.output_dir+"/spectrum.dat");
-    for (const char* name : {"benchmark results.dat", "scaling analysis.dat", "roundtrip error.dat", "spectrum.dat"}) {
+    for (const char* name : {"benchmark_results.dat", "scaling_analysis.dat", "roundtrip_error.dat", "spectrum.dat"}) {
         const auto path = std::filesystem::path(config.output_dir)/name;
         assert(std::filesystem::file_size(path) > 0);
         std::filesystem::remove(path);

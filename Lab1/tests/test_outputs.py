@@ -27,17 +27,17 @@ class OutputsTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             plot_results.performance(path)
             plot_results.spectrum(path, "linear")
-            for name in ("benchmark results.dat", "scaling analysis.dat", "performance plots.png",
-                         "spectrum.dat", "spectrum.png", "roundtrip error.dat"):
+            for name in ("benchmark_results.dat", "scaling_analysis.dat", "performance_plots.png",
+                         "spectrum.dat", "spectrum.png", "roundtrip_error.dat"):
                 self.assertTrue((path / name).is_file(), name)
                 self.assertGreater((path / name).stat().st_size, 0)
                 if name.endswith(".png"):
                     self.assertEqual((path / name).read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
-            timing = plot_results.load(path / "benchmark results.dat", 12)
+            timing = plot_results.load(path / "benchmark_results.dat", 12)
             self.assertTrue((timing[:, 7] >= 10).all())
             self.assertTrue((timing[:, 5] == timing[:, 6]).all())
-            scaling = plot_results.load(path / "scaling analysis.dat", 14)
-            errors = plot_results.load(path / "roundtrip error.dat", 8)
+            scaling = plot_results.load(path / "scaling_analysis.dat", 14)
+            errors = plot_results.load(path / "roundtrip_error.dat", 8)
             np.testing.assert_array_equal(scaling[:, :6], timing[:, :6])
             np.testing.assert_array_equal(errors[:, :6], timing[:, :6])
             np.testing.assert_array_equal(errors[:, 6:], timing[:, 10:])
@@ -55,10 +55,10 @@ class OutputsTest(unittest.TestCase):
             self.assertEqual(manifest["executable_sha256"], hashlib.sha256(Path(executable).read_bytes()).hexdigest())
             for name, digest in manifest["data_sha256"].items():
                 self.assertEqual(digest, hashlib.sha256((path / name).read_bytes()).hexdigest())
-            with Image.open(path / "performance plots.png") as image:
-                for key, name in (("TimingSHA256", "benchmark results.dat"),
-                                  ("ScalingSHA256", "scaling analysis.dat"),
-                                  ("ErrorsSHA256", "roundtrip error.dat")):
+            with Image.open(path / "performance_plots.png") as image:
+                for key, name in (("TimingSHA256", "benchmark_results.dat"),
+                                  ("ScalingSHA256", "scaling_analysis.dat"),
+                                  ("ErrorsSHA256", "roundtrip_error.dat")):
                     self.assertEqual(image.info[key], manifest["data_sha256"][name])
             with Image.open(path / "spectrum.png") as image:
                 self.assertEqual(image.info["SpectrumShape"], "64x64")
@@ -81,7 +81,7 @@ class OutputsTest(unittest.TestCase):
                                        "--chunk-grid", "4", "--chunks", "1", "--threads", "1,2",
                                        "--output", directory], capture_output=True, text=True)
             self.assertEqual(repeated.returncode, 0, repeated.stderr)
-            self.assertFalse((path / "performance plots.png").exists())
+            self.assertFalse((path / "performance_plots.png").exists())
             self.assertFalse((path / "benchmark_manifest.json").exists())
             # Errores de CLI reales, sin anunciar éxito ni producir resultados falsos.
             for args in (("demo", "--rows", "3"), ("demo", "--seed", "-1"),

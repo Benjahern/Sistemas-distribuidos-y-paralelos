@@ -40,9 +40,9 @@
     "src/main.cpp": "cc19372b278e47a94e88358ed564f474b934c931c6b5b04c7e40da8126d02b35"
   },
   "data_sha256": {
-    "benchmark results.dat": "65897bbdb4000e275ad3c14f9072d1077a5ac6caaa20fe8f350c5eb7dbce5e07",
-    "scaling analysis.dat": "0819b805d742acb38a8816b47e845b50e410441054a41dfdcb4c2abd19377ba1",
-    "roundtrip error.dat": "56a359019432ed287fe1e7841505f912ac0411538c48c9edad0afbd8bdff993b",
+    "benchmark_results.dat": "65897bbdb4000e275ad3c14f9072d1077a5ac6caaa20fe8f350c5eb7dbce5e07",
+    "scaling_analysis.dat": "0819b805d742acb38a8816b47e845b50e410441054a41dfdcb4c2abd19377ba1",
+    "roundtrip_error.dat": "56a359019432ed287fe1e7841505f912ac0411538c48c9edad0afbd8bdff993b",
     "spectrum.dat": "ef377f0661d1b3fb8f7a20bcc8523eba2073cbc4abf9f1305e0f11a255243134"
   },
   "platform": "Linux-7.2.7-1-cachyos-x86_64-with-glibc2.44",
