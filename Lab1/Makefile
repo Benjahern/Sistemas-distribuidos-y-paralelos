@@ -69,18 +69,11 @@ $(BUILD_DIR)/test_butterfly1d: $(BUILD_DIR)/tests/test_butterfly1d.o $(BUILD_DIR
 test-role3: $(BUILD_DIR)/test_fft2d
 	OMP_NUM_THREADS=$(TEST_THREADS) "$(abspath $(BUILD_DIR)/test_fft2d)"
 
-$(BUILD_DIR)/test_fft2d: $(BUILD_DIR)/tests/standalone/test_fft2d.o $(BUILD_DIR)/Fft2D.o
+$(BUILD_DIR)/test_fft2d: $(BUILD_DIR)/tests/test_fft2d.o $(BUILD_DIR)/Fft2D.o $(BUILD_DIR)/ComplexField.o $(BUILD_DIR)/Butterfly1D.o
 	$(CXX) $(CXXFLAGS) $(OPENMP) $^ -o $@
 
-$(BUILD_DIR)/tests/standalone/test_fft2d.o: tests/test_fft2d.cpp
-	@mkdir -p $(BUILD_DIR)/tests/standalone
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(OPENMP) -DFFT2D_STANDALONE_STUBS -MMD -MP -c $< -o $@
-
-test-integration: $(BUILD_DIR)/test_fft2d_integration
-	OMP_NUM_THREADS=$(TEST_THREADS) "$(abspath $(BUILD_DIR)/test_fft2d_integration)"
-
-$(BUILD_DIR)/test_fft2d_integration: $(BUILD_DIR)/tests/test_fft2d.o $(BUILD_DIR)/Fft2D.o $(BUILD_DIR)/ComplexField.o $(BUILD_DIR)/Butterfly1D.o
-	$(CXX) $(CXXFLAGS) $(OPENMP) $^ -o $@
+# Alias de compatibilidad: Rol 3 siempre prueba contra los módulos reales.
+test-integration: test-role3
 
 $(BUILD_DIR)/tests/%.o: tests/%.cpp
 	@mkdir -p $(BUILD_DIR)/tests
@@ -90,4 +83,4 @@ $(BUILD_DIR)/tests/%.o: tests/%.cpp
 clean:
 	rm -rf "$(BUILD_DIR)"
 
--include $(OBJECTS:.o=.d) $(TEST_OBJS:.o=.d) $(BUILD_DIR)/tests/standalone/test_fft2d.d
+-include $(OBJECTS:.o=.d) $(TEST_OBJS:.o=.d)
