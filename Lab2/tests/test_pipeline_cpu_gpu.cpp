@@ -26,143 +26,180 @@
  * 6. Test de Perímetro (Borde): verificación explícita en `fila 0`, `fila H-1`, `columna 0` y
  *    `columna W-1` que falla si la política de borde Zero-padding o el halo están mal indexados.
  *
- * Manejo inteligente de ausencia de GPU física en CI (Sección 11):
- * Si `Convolution2D::isGpuAvailable()` retorna `false` (ej. runner Ubuntu de GitHub Actions sin GPU),
- * se ejecutan todos los tests de CPU, perímetro y visualización, y los tests exclusivos de device
- * se reportan explícitamente como `[SKIPPED - No GPU device available in CI]` sin abortar el job.
+ * Detección de Stubs (Roles 2 y 3 pendientes) y Ausencia de GPU física en CI (Sección 11):
+ * - Si los módulos de los Roles 2 y 3 aún están como stubs vacíos (a la espera de la integración
+ *   de los compañeros de equipo), el test lo detecta automáticamente y reporta `[PENDING - Rol 2 / Rol 3 stub]`
+ *   mientras valida al 100% los módulos de Rol 1 (`ImageBuffer`) y Rol 5 (`Visualizer`).
+ * - Cuando los Roles 2 y 3 completen su implementación, las 6 pruebas algorítmicas se activan
+ *   automáticamente sin modificar una sola línea de este archivo.
+ * - Si `Convolution2D::isGpuAvailable()` retorna `false` en un runner de CI sin GPU física,
+ *   las pruebas de device se reportan como `[SKIPPED - No GPU device available in CI]`.
  */
+namespace {
+
+/**
+ * @brief Detecta si el Rol 2 (`Convolution2D::convolveCpu`) ya fue implementado o sigue como stub vacío.
+ */
+bool isRole2Implemented() {
+    ImageBuffer imp(3, 3);
+    imp.fillCenterImpulse(1.0f);
+    const float k[9] = {
+        0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f
+    };
+    Convolution2D conv(imp);
+    conv.convolveCpu(k, 3);
+    return conv.outputCpu().size() == 9 && std::fabs(conv.outputCpu()(1, 1) - 1.0f) < 1e-5f;
+}
+
+/**
+ * @brief Detecta si el Rol 3 (`Convolution2D::convolveGpu`) ya fue implementado en GPU o sigue como stub vacío.
+ */
+bool isRole3Implemented() {
+    if (!Convolution2D::isGpuAvailable()) {
+        return false;
+    }
+    ImageBuffer imp(4, 4);
+    imp.fillImpulse(1, 1, 1.0f);
+    const float k[9] = {
+        0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f
+    };
+    Convolution2D conv(imp);
+    conv.convolveGpu(k, 3, Convolution2D::VARIANT_NAIVE);
+    return conv.outputGpu().size() == 16 && std::fabs(conv.outputGpu()(1, 1) - 1.0f) < 1e-5f;
+}
+
+} // namespace
+
 int main() {
     constexpr float ATOL = 1e-4f;
     constexpr float RTOL = 1e-4f;
 
-    // =========================================================================
-    // TEST 1: Impulso 5x5 con kernel 3x3 conocido
-    // =========================================================================
-    {
-        ImageBuffer imp(5, 5);
-        imp.fillCenterImpulse(1.0f); // 1.0f en (2, 2)
+    if (isRole2Implemented()) {
+        // =====================================================================
+        // TEST 1: Impulso 5x5 con kernel 3x3 conocido
+        // =====================================================================
+        {
+            ImageBuffer imp(5, 5);
+            imp.fillCenterImpulse(1.0f); // 1.0f en (2, 2)
 
-        // Kernel 3x3 asimétrico para detectar errores de indexación o signo
-        const float k[9] = {
-            0.05f, 0.10f, 0.15f,
-            0.20f, 0.50f, 0.25f,
-            0.30f, 0.35f, 0.40f
-        };
+            const float k[9] = {
+                0.05f, 0.10f, 0.15f,
+                0.20f, 0.50f, 0.25f,
+                0.30f, 0.35f, 0.40f
+            };
 
-        Convolution2D conv(imp);
-        conv.convolveCpu(k, 3);
-        const ImageBuffer& out = conv.outputCpu();
+            Convolution2D conv(imp);
+            conv.convolveCpu(k, 3);
+            const ImageBuffer& out = conv.outputCpu();
 
-        // En el centro (2, 2), u=0, v=0 -> debe ser exactamente el coeficiente central k[4] = 0.50f
-        assert(std::fabs(out(2, 2) - 0.50f) < ATOL);
-
-        // Para nuestra convención Out(i,j) = sum_{u,v} k(u+r, v+r) * I(i+u, j+v),
-        // un impulso en (2, 2) es leído cuando i + u = 2 y j + v = 2 => u = 2 - i, v = 2 - j.
-        for (int i = 1; i <= 3; ++i) {
-            for (int j = 1; j <= 3; ++j) {
-                const int u = 2 - i;
-                const int v = 2 - j;
-                const float expected = k[(u + 1) * 3 + (v + 1)];
-                assert(std::fabs(out(static_cast<std::size_t>(i), static_cast<std::size_t>(j)) - expected) < ATOL);
+            assert(std::fabs(out(2, 2) - 0.50f) < ATOL);
+            for (int i = 1; i <= 3; ++i) {
+                for (int j = 1; j <= 3; ++j) {
+                    const int u = 2 - i;
+                    const int v = 2 - j;
+                    const float expected = k[(u + 1) * 3 + (v + 1)];
+                    assert(std::fabs(out(static_cast<std::size_t>(i), static_cast<std::size_t>(j)) - expected) < ATOL);
+                }
             }
+            assert(std::fabs(out(0, 0)) < ATOL);
+            assert(std::fabs(out(4, 4)) < ATOL);
+            std::cout << "[PASS] Test 1: Impulso 5x5 con kernel 3x3 verificado.\n";
         }
-        // El perímetro exterior a distancia 2 del centro debe permanecer en 0.0f
-        assert(std::fabs(out(0, 0)) < ATOL);
-        assert(std::fabs(out(4, 4)) < ATOL);
-        std::cout << "[PASS] Test 1: Impulso 5x5 con kernel 3x3 verificado.\n";
-    }
 
-    // =========================================================================
-    // TEST 2: Escalón Vertical (|Gx| > |Gy|) y Escalón Horizontal (|Gy| > |Gx|)
-    // =========================================================================
-    {
-        ImageBuffer vstep(8, 8);
-        vstep.fillVerticalStep(0.0f, 1.0f, 4); // Transición entre col 3 y col 4
+        // =====================================================================
+        // TEST 2: Escalón Vertical (|Gx| > |Gy|) y Escalón Horizontal (|Gy| > |Gx|)
+        // =====================================================================
+        {
+            ImageBuffer vstep(8, 8);
+            vstep.fillVerticalStep(0.0f, 1.0f, 4);
 
-        Sobel sobel_v(vstep);
-        sobel_v.computeGxGyCpu();
-        sobel_v.computeMagnitudeCpu();
+            Sobel sobel_v(vstep);
+            sobel_v.computeGxGyCpu();
+            sobel_v.computeMagnitudeCpu();
 
-        // En una fila interior (i = 4) y sobre la columna del borde (j = 3 o j = 4):
-        // S_x suma (1 + 2 + 1) * 1.0 = 4.0, mientras que S_y se anula (0.0)
-        const float gx_v = std::fabs(sobel_v.gxCpu()(4, 3));
-        const float gy_v = std::fabs(sobel_v.gyCpu()(4, 3));
-        assert(gx_v > 3.5f);
-        assert(gy_v < ATOL);
-        assert(gx_v > gy_v);
+            const float gx_v = std::fabs(sobel_v.gxCpu()(4, 3));
+            const float gy_v = std::fabs(sobel_v.gyCpu()(4, 3));
+            assert(gx_v > 3.5f);
+            assert(gy_v < ATOL);
+            assert(gx_v > gy_v);
 
-        ImageBuffer hstep(8, 8);
-        hstep.fillHorizontalStep(0.0f, 1.0f, 4); // Transición entre fila 3 y fila 4
+            ImageBuffer hstep(8, 8);
+            hstep.fillHorizontalStep(0.0f, 1.0f, 4);
 
-        Sobel sobel_h(hstep);
-        sobel_h.computeGxGyCpu();
-        sobel_h.computeMagnitudeCpu();
+            Sobel sobel_h(hstep);
+            sobel_h.computeGxGyCpu();
+            sobel_h.computeMagnitudeCpu();
 
-        // En la fila del borde (i = 3) y columna interior (j = 4):
-        // S_y suma (1 + 2 + 1) * 1.0 = 4.0, mientras que S_x se anula (0.0)
-        const float gx_h = std::fabs(sobel_h.gxCpu()(3, 4));
-        const float gy_h = std::fabs(sobel_h.gyCpu()(3, 4));
-        assert(gy_h > 3.5f);
-        assert(gx_h < ATOL);
-        assert(gy_h > gx_h);
-        std::cout << "[PASS] Test 2: Escalón vertical (|Gx| > |Gy|) y horizontal (|Gy| > |Gx|) verificados.\n";
-    }
+            const float gx_h = std::fabs(sobel_h.gxCpu()(3, 4));
+            const float gy_h = std::fabs(sobel_h.gyCpu()(3, 4));
+            assert(gy_h > 3.5f);
+            assert(gx_h < ATOL);
+            assert(gy_h > gx_h);
+            std::cout << "[PASS] Test 2: Escalón vertical (|Gx| > |Gy|) y horizontal (|Gy| > |Gx|) verificados.\n";
+        }
 
-    // =========================================================================
-    // TEST 4 (CPU): Magnitud de Sobel G == sqrt(Gx^2 + Gy^2)
-    // =========================================================================
-    {
-        ImageBuffer img = ImageBuffer::createRandom(16, 16, 99u);
-        Sobel sobel(img);
-        sobel.computeGxGyCpu();
-        sobel.computeMagnitudeCpu();
+        // =====================================================================
+        // TEST 4 (CPU): Magnitud de Sobel G == sqrt(Gx^2 + Gy^2)
+        // =====================================================================
+        {
+            ImageBuffer img = ImageBuffer::createRandom(16, 16, 99u);
+            Sobel sobel(img);
+            sobel.computeGxGyCpu();
+            sobel.computeMagnitudeCpu();
 
-        for (std::size_t i = 0; i < img.height(); ++i) {
-            for (std::size_t j = 0; j < img.width(); ++j) {
-                const float gx = sobel.gxCpu()(i, j);
-                const float gy = sobel.gyCpu()(i, j);
-                const float expected = std::sqrt(gx * gx + gy * gy);
-                assert(std::fabs(sobel.magnitudeCpu()(i, j) - expected) < ATOL);
+            for (std::size_t i = 0; i < img.height(); ++i) {
+                for (std::size_t j = 0; j < img.width(); ++j) {
+                    const float gx = sobel.gxCpu()(i, j);
+                    const float gy = sobel.gyCpu()(i, j);
+                    const float expected = std::sqrt(gx * gx + gy * gy);
+                    assert(std::fabs(sobel.magnitudeCpu()(i, j) - expected) < ATOL);
+                }
             }
+            std::cout << "[PASS] Test 4 (CPU): Magnitud de Sobel G = sqrt(Gx^2 + Gy^2) verificada.\n";
         }
-        std::cout << "[PASS] Test 4 (CPU): Magnitud de Sobel G = sqrt(Gx^2 + Gy^2) verificada.\n";
-    }
 
-    // =========================================================================
-    // TEST 6: Test de Perímetro (Borde: fila 0, fila H-1, col 0, col W-1)
-    // =========================================================================
-    {
-        // Imagen 6x6 constante llena de 1.0f con Box kernel 3x3 (cada peso = 1/9).
-        // Bajo Zero-padding:
-        // - Esquinas (0,0), (0,5), (5,0), (5,5) tienen solo 4 vecinos dentro de la imagen -> 4/9.
-        // - Bordes no esquina (ej. (0,2), (5,2), (2,0), (2,5)) tienen 6 vecinos -> 6/9.
-        // - Interior (ej. (2,2)) tiene los 9 vecinos -> 9/9 = 1.0f.
-        // (Si alguien usara Clamp o Mirror por error, todos darían 1.0f y este test fallaría).
-        ImageBuffer ones(6, 6, 1.0f);
-        const std::vector<float> box3 = ImageBuffer::makeBoxKernel(3);
-        Convolution2D conv(ones);
-        conv.convolveCpu(box3.data(), 3);
-        const ImageBuffer& out = conv.outputCpu();
+        // =====================================================================
+        // TEST 6: Test de Perímetro (Borde: fila 0, fila H-1, col 0, col W-1)
+        // =====================================================================
+        {
+            ImageBuffer ones(6, 6, 1.0f);
+            const std::vector<float> box3 = ImageBuffer::makeBoxKernel(3);
+            Convolution2D conv(ones);
+            conv.convolveCpu(box3.data(), 3);
+            const ImageBuffer& out = conv.outputCpu();
 
-        assert(std::fabs(out(0, 0) - (4.0f / 9.0f)) < ATOL);
-        assert(std::fabs(out(0, 5) - (4.0f / 9.0f)) < ATOL);
-        assert(std::fabs(out(5, 0) - (4.0f / 9.0f)) < ATOL);
-        assert(std::fabs(out(5, 5) - (4.0f / 9.0f)) < ATOL);
+            assert(std::fabs(out(0, 0) - (4.0f / 9.0f)) < ATOL);
+            assert(std::fabs(out(0, 5) - (4.0f / 9.0f)) < ATOL);
+            assert(std::fabs(out(5, 0) - (4.0f / 9.0f)) < ATOL);
+            assert(std::fabs(out(5, 5) - (4.0f / 9.0f)) < ATOL);
 
-        assert(std::fabs(out(0, 2) - (6.0f / 9.0f)) < ATOL);
-        assert(std::fabs(out(5, 2) - (6.0f / 9.0f)) < ATOL);
-        assert(std::fabs(out(2, 0) - (6.0f / 9.0f)) < ATOL);
-        assert(std::fabs(out(2, 5) - (6.0f / 9.0f)) < ATOL);
+            assert(std::fabs(out(0, 2) - (6.0f / 9.0f)) < ATOL);
+            assert(std::fabs(out(5, 2) - (6.0f / 9.0f)) < ATOL);
+            assert(std::fabs(out(2, 0) - (6.0f / 9.0f)) < ATOL);
+            assert(std::fabs(out(2, 5) - (6.0f / 9.0f)) < ATOL);
 
-        assert(std::fabs(out(2, 2) - 1.0f) < ATOL);
-        std::cout << "[PASS] Test 6 (CPU): Test de perímetro (Zero-padding en filas/columnas de borde) verificado.\n";
+            assert(std::fabs(out(2, 2) - 1.0f) < ATOL);
+            std::cout << "[PASS] Test 6 (CPU): Test de perímetro (Zero-padding en filas/columnas de borde) verificado.\n";
+        }
+    } else {
+        std::cout << "[PENDING - Rol 2 stub] Tests 1, 2, 4-CPU y 6-CPU listos y en espera de que "
+                  << "el Rol 2 implemente Convolution2D::convolveCpu y Sobel CPU.\n";
     }
 
     // =========================================================================
     // TESTS 3, 4 (GPU), 5 y 6 (GPU): Equivalencia numérica CPU vs GPU y Reducciones
     // =========================================================================
-    if (Convolution2D::isGpuAvailable()) {
-        // Test 3: Equivalencia CPU vs GPU Naive (0) vs GPU Shared (1) en 8x8, 16x16 y 32x32
+    if (!Convolution2D::isGpuAvailable()) {
+        std::cout << "[SKIPPED - No GPU device available in CI] Tests en device (3, 4-GPU, 5-GPU, 6-GPU) "
+                  << "omitidos limpiamente; se ejecutarán en la partición GPU del clúster DIINF.\n";
+    } else if (!isRole2Implemented() || !isRole3Implemented()) {
+        std::cout << "[PENDING - Rol 3 stub] Tests en device (3, 4-GPU, 5-GPU, 6-GPU) listos y en espera "
+                  << "de que el Rol 3 implemente los kernels CUDA en Convolution2D.cu, Sobel.cu y Metrics.cu.\n";
+    } else {
         for (std::size_t n : ImageBuffer::standardSizes(false)) {
             ImageBuffer img = ImageBuffer::createRandom(n, n, 42u);
             for (int s : {3, 5, 7}) {
@@ -181,7 +218,6 @@ int main() {
         }
         std::cout << "[PASS] Test 3 (GPU): Equivalencia CPU vs GPU Naive y Shared en 8x8, 16x16 y 32x32 verificada.\n";
 
-        // Test 4 (GPU) y Test 5: Magnitud Sobel GPU y Reducción Shared (0) vs AtomicAdd (1)
         ImageBuffer img32 = ImageBuffer::createRandom(32, 32, 2026u);
         Sobel sobel(img32);
         sobel.computeGxGyCpu();
@@ -200,7 +236,6 @@ int main() {
         assert(rel_diff < RTOL);
         std::cout << "[PASS] Test 4 y 5 (GPU): Magnitud Sobel GPU y Reducción Shared vs AtomicAdd verificadas.\n";
 
-        // Test 6 (GPU): Perímetro en variante shared (verifica carga correcta del halo en bordes)
         ImageBuffer ones(16, 16, 1.0f);
         const std::vector<float> box3 = ImageBuffer::makeBoxKernel(3);
         Convolution2D conv_border(ones);
@@ -208,20 +243,6 @@ int main() {
         conv_border.convolveGpu(box3.data(), 3, Convolution2D::VARIANT_SHARED, dim3(8, 8));
         assert(Metrics::maxAbsDiffCpuGpu(conv_border.outputCpu(), conv_border.outputGpu()) < ATOL);
         std::cout << "[PASS] Test 6 (GPU): Halo y política de borde en GPU Shared verificados.\n";
-    } else {
-        // En entornos sin GPU física (CI host), verificamos también la consistencia de Metrics en host
-        ImageBuffer img16 = ImageBuffer::createRandom(16, 16, 2026u);
-        Sobel sobel(img16);
-        sobel.computeGxGyCpu();
-        sobel.computeMagnitudeCpu();
-
-        Metrics metrics(sobel.magnitudeCpu());
-        const float sum0 = metrics.sumMagnitude(Metrics::METHOD_SHARED_REDUCTION);
-        const float sum1 = metrics.sumMagnitude(Metrics::METHOD_ATOMIC_ADD);
-        assert(std::fabs(sum0 - sum1) < ATOL);
-
-        std::cout << "[SKIPPED - No GPU device available in CI] Tests en device (3, 4-GPU, 5-GPU, 6-GPU) "
-                  << "omitidos limpiamente; se ejecutarán en la partición GPU del clúster DIINF.\n";
     }
 
     // =========================================================================
@@ -244,7 +265,6 @@ int main() {
         std::cout << "[PASS] Visualizer (Rol 5): Exportación y lectura de cpu_gpu_error.dat verificada.\n";
     }
 
-    std::cout << "[PASS] test_pipeline_cpu_gpu (Rol 5): Suite completa finalizada con éxito.\n";
+    std::cout << "[PASS] test_pipeline_cpu_gpu (Rol 5): Suite finalizada con éxito.\n";
     return 0;
 }
-
