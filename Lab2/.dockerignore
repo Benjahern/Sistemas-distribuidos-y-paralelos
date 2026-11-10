@@ -1,0 +1,6 @@
+build/
+results/
+*.o
+*.d
+__pycache__/
+

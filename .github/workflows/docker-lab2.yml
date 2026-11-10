@@ -1,0 +1,40 @@
+name: Docker CUDA Smoke & Tests - Lab2
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "Lab2/**"
+      - ".github/workflows/docker-lab2.yml"
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - "Lab2/**"
+      - ".github/workflows/docker-lab2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    name: Build and run Lab2 CUDA container
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image (with nvcc CUDA toolkit)
+        run: docker build --tag lab2-image-cuda:ci --file Lab2/Dockerfile Lab2
+
+      - name: Run full test suite in container
+        run: docker run --rm lab2-image-cuda:ci make test
+
+      - name: Run Sobel demonstration in container
+        run: docker run --rm lab2-image-cuda:ci
+
