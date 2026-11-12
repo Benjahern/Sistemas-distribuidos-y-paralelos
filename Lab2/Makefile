@@ -34,7 +34,7 @@ OBJECTS     := $(CPP_OBJECTS) $(CU_OBJECTS)
 LIB_OBJS    := $(filter-out $(BUILD_DIR)/main.o,$(OBJECTS))
 
 .DEFAULT_GOAL := all
-.PHONY: all clean test demo plots
+.PHONY: all clean test test-cpu demo plots
 
 all: $(TARGET)
 
@@ -60,8 +60,14 @@ $(BUILD_DIR)/test_image_buffer: $(BUILD_DIR)/tests/test_image_buffer.o $(BUILD_D
 $(BUILD_DIR)/test_pipeline_cpu_gpu: $(BUILD_DIR)/tests/test_pipeline_cpu_gpu.o $(LIB_OBJS)
 	$(LINK_CMD)
 
-test: all $(BUILD_DIR)/test_image_buffer $(BUILD_DIR)/test_pipeline_cpu_gpu
+$(BUILD_DIR)/test_cpu_reference: $(BUILD_DIR)/tests/test_cpu_reference.o $(BUILD_DIR)/ImageBuffer.o $(BUILD_DIR)/Convolution2D.o $(BUILD_DIR)/Sobel.o $(BUILD_DIR)/Convolution2D_cu.o $(BUILD_DIR)/Sobel_cu.o
+	$(LINK_CMD)
+
+test-cpu: $(BUILD_DIR)/test_image_buffer $(BUILD_DIR)/test_cpu_reference
 	"$(abspath $(BUILD_DIR)/test_image_buffer)"
+	"$(abspath $(BUILD_DIR)/test_cpu_reference)"
+
+test: all test-cpu $(BUILD_DIR)/test_pipeline_cpu_gpu
 	"$(abspath $(BUILD_DIR)/test_pipeline_cpu_gpu)"
 	LAB2_EXECUTABLE="$(abspath $(TARGET))" LAB2_TEST_DIR="$(abspath $(BUILD_DIR))" $(PYTHON) tests/test_outputs.py
 

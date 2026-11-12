@@ -14,7 +14,7 @@
  * @brief Suite de pruebas automáticas obligatorias (Rol 5 - Sección 11 de lab2.md y AGENTS.md).
  *
  * Cubre los 6 ítems obligatorios del checklist de `make test`:
- * 1. Impulso 5x5 con kernel 3x3 conocido: salida coincide con el kernel centrado (invertido)
+ * 1. Impulso 5x5 con kernel 3x3 conocido: salida coincide con el kernel centrado
  *    bajo la política de borde Zero-padding, y el centro coincide con el coeficiente central.
  * 2. Escalón vertical y horizontal: en escalón vertical `|G_x| > |G_y|` sobre el borde;
  *    en escalón horizontal `|G_y| > |G_x|`.
@@ -99,8 +99,8 @@ int main() {
             assert(std::fabs(out(2, 2) - 0.50f) < ATOL);
             for (int i = 1; i <= 3; ++i) {
                 for (int j = 1; j <= 3; ++j) {
-                    const int u = 2 - i;
-                    const int v = 2 - j;
+                    const int u = i - 2;
+                    const int v = j - 2;
                     const float expected = k[(u + 1) * 3 + (v + 1)];
                     assert(std::fabs(out(static_cast<std::size_t>(i), static_cast<std::size_t>(j)) - expected) < ATOL);
                 }

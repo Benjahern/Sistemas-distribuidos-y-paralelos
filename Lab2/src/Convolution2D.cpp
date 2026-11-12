@@ -1,13 +1,12 @@
 #include "Convolution2D.h"
 
+#include <cstdint>
+#include <stdexcept>
+#include <utility>
+
 /**
  * @file Convolution2D.cpp
- * @brief Stub de integración para Rol 2 (`Convolution2D` en CPU) y delegación de sobrecargas GPU.
- *
- * NOTA DE EQUIPO:
- * La implementación real de `convolveCpu(const float* k, int s)` corresponde al integrante
- * del **Rol 2 (Convolución CPU)**. Aquí se mantienen únicamente los constructores, accesores
- * y las firmas vacías (stubs) para que el proyecto compile e integre limpiamente con los Roles 1 y 5.
+ * @brief Referencia serial del Rol 2 y delegación de sobrecargas GPU.
  */
 
 Convolution2D::Convolution2D(const ImageBuffer& input)
@@ -21,9 +20,36 @@ void Convolution2D::setInput(const ImageBuffer& input) {
     output_gpu_.resize(input.height(), input.width(), 0.0f);
 }
 
-void Convolution2D::convolveCpu(const float* /*k*/, int /*s*/) {
-    // TODO (Rol 2): Implementar convolución 2D serial en CPU con política de borde Zero-padding
-    output_cpu_.resize(input_.height(), input_.width(), 0.0f);
+void Convolution2D::convolveCpu(const float* k, int s) {
+    if (k == nullptr || s <= 0 || s % 2 == 0) {
+        throw std::invalid_argument("convolveCpu: k no nulo y s impar positivo requeridos");
+    }
+
+    // Resultado independiente: permite reutilizar el operador sin modificar la entrada
+    // y conserva la salida previa si falla una reserva de memoria.
+    ImageBuffer result(input_.height(), input_.width());
+    const auto height = static_cast<std::int64_t>(input_.height());
+    const auto width = static_cast<std::int64_t>(input_.width());
+    const std::int64_t radius = s / 2;
+    for (std::int64_t i = 0; i < height; ++i) {
+        for (std::int64_t j = 0; j < width; ++j) {
+            float sum = 0.0f;
+            for (int ku = 0; ku < s; ++ku) {
+                const auto source_i = i - (static_cast<std::int64_t>(ku) - radius);
+                if (source_i < 0 || source_i >= height) continue;
+                const float* source_row = input_.row(static_cast<std::size_t>(source_i));
+                for (int kv = 0; kv < s; ++kv) {
+                    const auto source_j = j - (static_cast<std::int64_t>(kv) - radius);
+                    if (source_j < 0 || source_j >= width) continue;
+                    const auto kernel_index = static_cast<std::size_t>(ku) *
+                                              static_cast<std::size_t>(s) + kv;
+                    sum += k[kernel_index] * source_row[static_cast<std::size_t>(source_j)];
+                }
+            }
+            result(static_cast<std::size_t>(i), static_cast<std::size_t>(j)) = sum;
+        }
+    }
+    output_cpu_ = std::move(result);
 }
 
 void Convolution2D::convolveGpu(const float* k, int s) {

@@ -24,9 +24,9 @@ Lab2/
 ├── src/
 │   ├── main.cpp            # Punto de entrada CLI (demo, exportación de panel y errores)
 │   ├── ImageBuffer.cpp     # Rol 1 (Implementado completo)
-│   ├── Convolution2D.cpp   # Stub de integración (a completar por Rol 2)
+│   ├── Convolution2D.cpp   # Referencia serial CPU (Rol 2)
 │   ├── Convolution2D.cu    # Stub de integración (a completar por Rol 3)
-│   ├── Sobel.cpp           # Stub de integración (a completar por Rol 2)
+│   ├── Sobel.cpp           # Gradientes y magnitud CPU (Rol 2)
 │   ├── Sobel.cu            # Stub de integración (a completar por Rol 3)
 │   ├── Metrics.cu          # Stub de integración (a completar por Rol 3)
 │   ├── Benchmark.cpp       # Stub de integración (a completar por Rol 4)
@@ -52,7 +52,7 @@ En conformidad con la **Sección 3 del enunciado**, para un equipo de 4 integran
 | Rol | Integrante | Módulos / Archivos | Estado Actual y Responsabilidades |
 | :--- | :--- | :--- | :--- |
 | **1. Imagen y I/O** | Mateo Valle (Rol 1 + 5) | `include/ImageBuffer.h`, `src/ImageBuffer.cpp` | **Implementado completo.** Gestión del buffer host $(H \times W)$ en `float` (*row-major*), lectura/escritura PGM (`P2`/`P5`) y `.dat`, normalización a $[0, 1]$ y generación determinista con semilla fija para todos los tamaños ($8^2, 16^2, 32^2, 512^2, 1024^2, 2048^2, 4096^2$). |
-| **2. Convolución CPU** | Integrante Rol 2 | `include/Convolution2D.h`, `src/Convolution2D.cpp`, `include/Sobel.h`, `src/Sobel.cpp` | **Stub / Contrato listo.** Referencia serial pura en CPU para convolución 2D bajo política *Zero-padding*, cálculo de $G_x, G_y, G$ reutilizando `convolveCpu`. |
+| **2. Convolución CPU** | Nicolás Sarabia | `include/Convolution2D.h`, `src/Convolution2D.cpp`, `include/Sobel.h`, `src/Sobel.cpp` | **Implementado y validado localmente en CPU.** Referencia serial pura en CPU para convolución 2D bajo política *Zero-padding*, cálculo de $G_x, G_y, G$ reutilizando `convolveCpu`. |
 | **3. Kernels CUDA** | Integrante Rol 3 | `src/Convolution2D.cu`, `src/Sobel.cu`, `include/Metrics.h`, `src/Metrics.cu` | **Stub / Contrato listo.** Kernels `naive` y `shared` (con *tile* + halo y `__syncthreads()`), función auxiliar `__device__`, `CUDA_CHECK`, reducción en `__shared__` vs `atomicAdd`. |
 | **4. Host/Device y Benchmarks** | Integrante Rol 4 | `include/Benchmark.h`, `src/Benchmark.cpp` | **Stub / Contrato listo.** Gestión de memoria device, mediciones *kernel-only* vs *end-to-end*, barrido de bloques 2D, Ley de Amdahl y generación de `benchmark_results.dat` y `block_study.dat`. |
 | **5. Calidad, CI y Visualización** | Mateo Valle (Rol 1 + 5) | `include/Visualizer.h`, `src/Visualizer.cpp`, `tests/`, `scripts/plot_results.py`, `Dockerfile`, `.github/workflows/` | **Implementado completo.** Suite de pruebas (`make test`), manejo de CI sin GPU física, contenedor Docker con CUDA, exportación de `cpu_gpu_error.dat` y generación de `sobel_panel.png` y `performance_plots.png`. |
@@ -62,7 +62,7 @@ En conformidad con la **Sección 3 del enunciado**, para un equipo de 4 integran
 > * `Visualizer` y `tests/` (Rol 5) consumen la API pública de `ImageBuffer`, `Convolution2D`, `Sobel` y `Metrics` sin acceder a detalles internos de almacenamiento.
 >
 > **Nota de coordinación con Roles 2, 3 y 4:**
-> * Los archivos `Convolution2D.cpp/.cu`, `Sobel.cpp/.cu`, `Metrics.cu` y `Benchmark.cpp` contienen únicamente las declaraciones/firmas vacías (*stubs*) para que el repositorio compile con `nvcc` y pase el pipeline de CI mientras los integrantes de los Roles 2, 3 y 4 completan sus módulos respectivos.
+> * Las rutas CPU de `Convolution2D.cpp` y `Sobel.cpp` están implementadas. Las rutas GPU y `Benchmark.cpp` siguen como stubs de los Roles 3 y 4; un CI verde no certifica esas implementaciones pendientes.
 
 ---
 
@@ -230,7 +230,7 @@ public:
   3. Al exportar buffers de gradientes ($G_x, G_y, G$) que pueden tomar valores fuera de $[0, 1]$ (en particular $G_x, G_y \in [-4, 4]$ y $G \in [0, 4\sqrt{2}]$), `Visualizer` guarda los valores exactos sin recortar en archivos `.dat` y aplica reescalado lineal min–max al exportar vistas previas `.pgm`.
 
 ### 4.2. Política de Borde Única: **Zero-Padding**
-* **Decisión:** Se adopta **Zero-padding** en todo el proyecto (CPU serial, GPU `naive` y GPU `shared`). Cualquier lectura de un vecino $(i + u, j + v)$ fuera del dominio válido $[0, H-1] \times [0, W-1]$ retorna exactamente `0.0f`.
+* **Decisión:** Se adopta **Zero-padding** en todo el proyecto (CPU serial, GPU `naive` y GPU `shared`). Cualquier lectura de un vecino $(i - u, j - v)$ fuera del dominio válido $[0, H-1] \times [0, W-1]$ retorna exactamente `0.0f`.
 * **Justificación:**
   1. Es matemáticamente transparente y permite verificar analíticamente el **Test 1 (Impulso $5 \times 5$)** y el **Test 6 (Perímetro)**: en una imagen constante de unos ($1.0$) filtrada con un Box kernel $3 \times 3$, las esquinas valen exactamente $4/9$, los bordes laterales $6/9$ y el interior $9/9 = 1.0$, lo que permite detectar de inmediato cualquier error de indexación en el halo de `__shared__`.
   2. Debe aplicarse de forma idéntica en la referencia CPU serial (Rol 2) y en los kernels `naive` y `shared` (Rol 3).
@@ -238,7 +238,9 @@ public:
 ### 4.3. Convención de Signos de la Convolución y Sobel
 Para un kernel cuadrado de lado impar $s = 2r + 1$ e índices locales $u, v \in \{-r, \dots, r\}$, tanto CPU como GPU deben evaluar:
 
-$$\text{Out}(i, j) = \sum_{u=-r}^{r} \sum_{v=-r}^{r} k(u + r, v + r) \cdot I_{\text{pad}}(i + u, j + v)$$
+$$\text{Out}(i, j) = \sum_{u=-r}^{r} \sum_{v=-r}^{r} k(u + r, v + r) \cdot I_{\text{pad}}(i - u, j - v)$$
+
+Es la ecuación (1) del PDF: el impulso centrado reproduce el kernel sin invertirlo. En un escalón ascendente vertical, el gradiente interior es `Gx = -4, Gy = 0`; en uno horizontal es `Gx = 0, Gy = -4`. Una implementación con `I(i+u,j+v)` debe reflejar los coeficientes. El Rol 3 debe mantener esta convención.
 
 Con los operadores de Sobel $3 \times 3$ fijos:
 
@@ -310,3 +312,30 @@ Siguiendo la **Sección 11 del enunciado**:
    * Si `cudaGetDeviceCount` detecta `0` dispositivos físicos en el runner de CI, las pruebas que requieren lanzar kernels en hardware se reportan explícitamente como `[SKIPPED - No GPU device available in CI]` sin hacer fallar el pipeline.
 2. **En la Partición GPU del Clúster DIINF (`sbatch benchmark-gpu.slurm`):**
    * `Convolution2D::isGpuAvailable()` retorna `true` y, una vez integrados los Roles 2, 3 y 4, `make test` ejecuta **todas** las pruebas en hardware GPU real (incluyendo equivalencia numérica CPU vs. GPU Naive vs. GPU Shared en $8^2, 16^2, 32^2$, reducción `__shared__` vs. `atomicAdd` y test de perímetro en GPU), además de los benchmarks finales.
+
+
+## Referencia CPU del Rol 2
+
+`convolveCpu(k,s)` acepta un puntero a `s*s` coeficientes y un lado impar positivo.
+Rechaza punteros nulos y lados inválidos con `std::invalid_argument`; una imagen vacía
+produce salida vacía. Conserva la entrada y calcula en `float`, con acumulación serial
+en orden de filas y columnas del kernel, sin librerías de filtrado ni OpenMP.
+Los kernels box y gaussianos de `ImageBuffer` se reutilizan para blur 3/5/7.
+`computeGxGyCpu()` llama dos veces a esta misma API con `SX` y `SY` sin alterar sus
+signos. Después se llama a `computeMagnitudeCpu()` para el map de magnitud.
+Los buffers se administran mediante `ImageBuffer`/`std::vector` (RAII).
+
+Desde `Lab2/`:
+
+```bash
+make test-cpu   # ImageBuffer + referencia Rol 2, sin omitir errores como stubs
+make test       # Lo anterior + suite de integración y exportación
+make test-cpu BUILD_DIR=build-sanitize CXXFLAGS="-O1 -g -std=c++17 -Wall -Wextra -Wpedantic -fsanitize=address,undefined -fno-omit-frame-pointer"
+```
+
+`tests/test_cpu_reference.cpp` comprueba impulso asimétrico, resultado rectangular
+calculado a mano, perímetro, blur 3/5/7, kernels mayores que la imagen, identidad y
+desplazamiento direccional sobre ruido 8/16/32, signos de ambos escalones,
+magnitud, reutilización de objetos, imágenes vacías y argumentos inválidos.
+Estas pruebas no dependen del detector de stubs de la suite del Rol 5.
+La compilación CUDA y la equivalencia con device requieren validación posterior.
