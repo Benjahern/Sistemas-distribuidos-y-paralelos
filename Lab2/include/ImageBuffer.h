@@ -110,14 +110,16 @@ public:
     const float* data() const noexcept { return data_.data(); }
 
     /**
-     * @brief Retorna un puntero al inicio de la fila `i`.
+     * @brief Retorna un puntero al inicio de la fila `i` (sin costo de verificación de límites).
+     * @pre `i < height_` (para acceso con verificación de límites use `at(i, j)`).
      * @param i Índice de fila en [0, H-1].
      * @return Puntero al elemento (i, 0).
      */
     float* row(std::size_t i) noexcept { return data_.data() + i * width_; }
 
     /**
-     * @brief Retorna un puntero constante al inicio de la fila `i`.
+     * @brief Retorna un puntero constante al inicio de la fila `i` (sin costo de verificación de límites).
+     * @pre `i < height_` (para acceso con verificación de límites use `at(i, j)`).
      * @param i Índice de fila en [0, H-1].
      * @return Puntero constante al elemento (i, 0).
      */

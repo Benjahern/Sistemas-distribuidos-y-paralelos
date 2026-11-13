@@ -26,7 +26,10 @@ std::size_t checkedMultiplySize(std::size_t a, std::size_t b, const char* contex
     if (a == 0 || b == 0) {
         return 0;
     }
-    constexpr std::size_t max_elements = std::numeric_limits<std::size_t>::max() / sizeof(float);
+    constexpr std::size_t max_elements = std::min(
+        std::numeric_limits<std::size_t>::max() / sizeof(float),
+        static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())
+    );
     if (a > max_elements / b) {
         throw std::overflow_error(std::string(context) + ": desbordamiento al calcular H * W");
     }
@@ -191,6 +194,7 @@ void ImageBuffer::readPgm(const std::string& path) {
         throw std::runtime_error("ImageBuffer::readPgm: no se pudo abrir el archivo " + path);
     }
 
+    skipPgmCommentsAndWhitespace(in);
     std::string magic;
     in >> magic;
     if (magic != "P2" && magic != "P5") {
@@ -242,6 +246,11 @@ void ImageBuffer::readPgm(const std::string& path) {
             }
             parsed[idx] = static_cast<float>(sample) * inv_max;
         }
+        skipPgmCommentsAndWhitespace(in);
+        std::string trailing;
+        if (in >> trailing) {
+            throw std::runtime_error("ImageBuffer::readPgm: datos extra o espurios al final del archivo P2 en " + path);
+        }
     } else {
         if (maxval < 256) {
             std::vector<unsigned char> raw(total);
@@ -273,6 +282,10 @@ void ImageBuffer::readPgm(const std::string& path) {
                 parsed[idx] = static_cast<float>(sample) * inv_max;
             }
         }
+        char extra_byte = 0;
+        if (in.read(&extra_byte, 1)) {
+            throw std::runtime_error("ImageBuffer::readPgm: datos extra o espurios al final del archivo P5 en " + path);
+        }
     }
 
     // Actualización atómica del estado tras lectura exitosa
@@ -284,6 +297,12 @@ void ImageBuffer::readPgm(const std::string& path) {
 void ImageBuffer::writePgm(const std::string& path, bool binary, bool normalize_minmax) const {
     if (empty()) {
         throw std::runtime_error("ImageBuffer::writePgm: no se puede escribir una imagen vacía en " + path);
+    }
+
+    for (std::size_t idx = 0; idx < data_.size(); ++idx) {
+        if (!std::isfinite(data_[idx])) {
+            throw std::runtime_error("ImageBuffer::writePgm: el buffer contiene valores no finitos (NaN o Inf)");
+        }
     }
 
     std::ofstream out(path, binary ? (std::ios::out | std::ios::binary) : std::ios::out);
@@ -330,6 +349,12 @@ void ImageBuffer::writePgm(const std::string& path, bool binary, bool normalize_
 void ImageBuffer::writeDat(const std::string& path) const {
     if (empty()) {
         throw std::runtime_error("ImageBuffer::writeDat: no se puede escribir una imagen vacía en " + path);
+    }
+
+    for (std::size_t idx = 0; idx < data_.size(); ++idx) {
+        if (!std::isfinite(data_[idx])) {
+            throw std::runtime_error("ImageBuffer::writeDat: el buffer contiene valores no finitos (NaN o Inf)");
+        }
     }
 
     std::ofstream out(path);
@@ -383,6 +408,12 @@ void ImageBuffer::readDat(const std::string& path) {
         if (!(in >> parsed[idx]) || !std::isfinite(parsed[idx])) {
             throw std::runtime_error("ImageBuffer::readDat: datos insuficientes, no numéricos o no finitos en " + path);
         }
+    }
+
+    skipPgmCommentsAndWhitespace(in);
+    std::string trailing;
+    if (in >> trailing) {
+        throw std::runtime_error("ImageBuffer::readDat: datos extra o espurios al final del archivo en " + path);
     }
 
     data_ = std::move(parsed);

@@ -392,7 +392,44 @@ int main() {
         [&]() { img_guard.readPgm(trunc_p5_pgm); });
     std::remove(trunc_p5_pgm.c_str());
 
-    // 8.6. Archivos .dat con datos no válidos y escritura de imagen vacía
+    // Archivo PGM con comentario antes de magic P2
+    const std::string comment_before_magic_pgm = "/tmp/lab2_comment_magic.pgm";
+    {
+        std::ofstream out(comment_before_magic_pgm);
+        out << "# Comentario al inicio\nP2\n2 2\n255\n10 20 30 40\n";
+    }
+    ImageBuffer img_comment_magic;
+    img_comment_magic.readPgm(comment_before_magic_pgm);
+    assert(img_comment_magic.height() == 2 && img_comment_magic.width() == 2);
+    std::remove(comment_before_magic_pgm.c_str());
+
+    // Archivo P2 con datos espurios o sobrantes al final
+    const std::string trailing_p2_pgm = "/tmp/lab2_trailing_p2.pgm";
+    {
+        std::ofstream out(trailing_p2_pgm);
+        out << "P2\n2 2\n255\n10 20 30 40\n999_extra\n";
+    }
+    expectInvalidDataError<std::runtime_error>(
+        "readPgm P2 con datos extra al final",
+        "datos extra o espurios",
+        [&]() { img_guard.readPgm(trailing_p2_pgm); });
+    std::remove(trailing_p2_pgm.c_str());
+
+    // Archivo P5 con datos espurios o sobrantes al final
+    const std::string trailing_p5_pgm = "/tmp/lab2_trailing_p5.pgm";
+    {
+        std::ofstream out(trailing_p5_pgm, std::ios::binary);
+        out << "P5\n2 2\n255\n";
+        const unsigned char raw[5] = {10, 20, 30, 40, 50}; // 5 bytes para 2x2 = 4 píxeles
+        out.write(reinterpret_cast<const char*>(raw), 5);
+    }
+    expectInvalidDataError<std::runtime_error>(
+        "readPgm P5 con datos extra al final",
+        "datos extra o espurios",
+        [&]() { img_guard.readPgm(trailing_p5_pgm); });
+    std::remove(trailing_p5_pgm.c_str());
+
+    // 8.6. Archivos .dat con datos no válidos y escritura de imagen vacía o con valores no finitos
     expectInvalidDataError<std::runtime_error>(
         "writePgm sobre imagen vacía",
         "no se puede escribir una imagen vacía",
@@ -402,6 +439,21 @@ int main() {
         "writeDat sobre imagen vacía",
         "no se puede escribir una imagen vacía",
         [&]() { empty_buf.writeDat("/tmp/lab2_empty.dat"); });
+
+    // writePgm y writeDat con valores NaN / Inf inyectados en el buffer
+    {
+        ImageBuffer img_nan(2, 2, 1.0f);
+        img_nan.data()[1] = nan_val;
+        expectInvalidDataError<std::runtime_error>(
+            "writePgm con NaN en buffer",
+            "valores no finitos",
+            [&]() { img_nan.writePgm("/tmp/lab2_nan.pgm"); });
+
+        expectInvalidDataError<std::runtime_error>(
+            "writeDat con NaN en buffer",
+            "valores no finitos",
+            [&]() { img_nan.writeDat("/tmp/lab2_nan.dat"); });
+    }
 
     const std::string bad_header_dat = "/tmp/lab2_bad_header.dat";
     {
@@ -424,6 +476,17 @@ int main() {
         "datos insuficientes, no numéricos o no finitos",
         [&]() { img_guard.readDat(corrupt_dat); });
     std::remove(corrupt_dat.c_str());
+
+    const std::string trailing_dat = "/tmp/lab2_trailing_data.dat";
+    {
+        std::ofstream out(trailing_dat);
+        out << "# height 2 width 2\n0.1 0.2 0.3 0.4\n999.0\n";
+    }
+    expectInvalidDataError<std::runtime_error>(
+        "readDat con datos extra al final",
+        "datos extra o espurios",
+        [&]() { img_guard.readDat(trailing_dat); });
+    std::remove(trailing_dat.c_str());
 
     // Verificar que tras todos los intentos fallidos de lectura, img_guard sigue intacto (3x3)
     assert(img_guard.height() == 3 && img_guard.width() == 3 && img_guard(0, 0) == 0.5f);
