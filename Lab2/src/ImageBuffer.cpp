@@ -1,6 +1,7 @@
 #include "ImageBuffer.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <fstream>
@@ -17,6 +18,7 @@ namespace {
  * @brief Calcula `a * b` verificando desbordamiento en `std::size_t` (y contra `max_size` de `std::vector<float>`).
  * @param a Primer factor (ej. `height`).
  * @param b Segundo factor (ej. `width`).
+ * @param context Nombre del método que realiza la validación para el mensaje de error.
  * @return Producto `a * b`, o `0` si alguno de los factores es `0`.
  * @throws std::overflow_error si `a * b` desborda `std::size_t` o excede el tamaño máximo asignable.
  */
@@ -45,6 +47,16 @@ void skipPgmCommentsAndWhitespace(std::istream& in) {
     }
 }
 
+/**
+ * @brief Valida que un valor `float` sea finito (ni NaN ni infinito).
+ */
+void requireFinite(float value, const char* context, const char* param_name) {
+    if (!std::isfinite(value)) {
+        throw std::invalid_argument(std::string(context) + ": el parámetro '" + param_name +
+                                    "' debe ser un valor finito (no NaN ni Inf)");
+    }
+}
+
 } // namespace
 
 ImageBuffer::ImageBuffer(std::size_t height, std::size_t width, float initial_value) {
@@ -53,19 +65,24 @@ ImageBuffer::ImageBuffer(std::size_t height, std::size_t width, float initial_va
 
 float& ImageBuffer::at(std::size_t i, std::size_t j) {
     if (i >= height_ || j >= width_) {
-        throw std::out_of_range("ImageBuffer::at: índice (i, j) fuera de rango");
+        throw std::out_of_range("ImageBuffer::at: índice (i=" + std::to_string(i) +
+                                ", j=" + std::to_string(j) + ") fuera de rango (" +
+                                std::to_string(height_) + "x" + std::to_string(width_) + ")");
     }
     return data_[i * width_ + j];
 }
 
 const float& ImageBuffer::at(std::size_t i, std::size_t j) const {
     if (i >= height_ || j >= width_) {
-        throw std::out_of_range("ImageBuffer::at const: índice (i, j) fuera de rango");
+        throw std::out_of_range("ImageBuffer::at const: índice (i=" + std::to_string(i) +
+                                ", j=" + std::to_string(j) + ") fuera de rango (" +
+                                std::to_string(height_) + "x" + std::to_string(width_) + ")");
     }
     return data_[i * width_ + j];
 }
 
 void ImageBuffer::resize(std::size_t new_height, std::size_t new_width, float value) {
+    requireFinite(value, "ImageBuffer::resize", "value");
     const std::size_t total = checkedMultiplySize(new_height, new_width, "ImageBuffer::resize");
     if (total == 0) {
         // Si cualquiera de las dimensiones es 0, normalizamos a 0 x 0 para que
@@ -84,27 +101,38 @@ void ImageBuffer::resize(std::size_t new_height, std::size_t new_width, float va
     width_ = new_width;
 }
 
-void ImageBuffer::fill(float value) noexcept {
+void ImageBuffer::fill(float value) {
+    requireFinite(value, "ImageBuffer::fill", "value");
     std::fill(data_.begin(), data_.end(), value);
 }
 
 void ImageBuffer::fillImpulse(std::size_t impulse_i, std::size_t impulse_j, float amplitude) {
+    requireFinite(amplitude, "ImageBuffer::fillImpulse", "amplitude");
     if (impulse_i >= height_ || impulse_j >= width_) {
-        throw std::out_of_range("ImageBuffer::fillImpulse: coordenadas fuera de los límites");
+        throw std::out_of_range("ImageBuffer::fillImpulse: coordenadas (" +
+                                std::to_string(impulse_i) + ", " + std::to_string(impulse_j) +
+                                ") fuera de los límites (" + std::to_string(height_) + "x" +
+                                std::to_string(width_) + ")");
     }
     fill(0.0f);
     data_[impulse_i * width_ + impulse_j] = amplitude;
 }
 
 void ImageBuffer::fillCenterImpulse(float amplitude) {
+    requireFinite(amplitude, "ImageBuffer::fillCenterImpulse", "amplitude");
     if (empty()) {
-        throw std::runtime_error("ImageBuffer::fillCenterImpulse: el buffer está vacío");
+        throw std::runtime_error("ImageBuffer::fillCenterImpulse: el buffer está vacío (0x0)");
     }
     fillImpulse(height_ / 2, width_ / 2, amplitude);
 }
 
 void ImageBuffer::fillVerticalStep(float low_val, float high_val, std::size_t split_col) {
+    requireFinite(low_val, "ImageBuffer::fillVerticalStep", "low_val");
+    requireFinite(high_val, "ImageBuffer::fillVerticalStep", "high_val");
     if (empty()) return;
+    if (split_col > width_) {
+        throw std::out_of_range("ImageBuffer::fillVerticalStep: split_col excede el ancho W");
+    }
     const std::size_t split = (split_col == 0) ? (width_ / 2) : split_col;
     for (std::size_t i = 0; i < height_; ++i) {
         float* r = row(i);
@@ -115,7 +143,12 @@ void ImageBuffer::fillVerticalStep(float low_val, float high_val, std::size_t sp
 }
 
 void ImageBuffer::fillHorizontalStep(float low_val, float high_val, std::size_t split_row) {
+    requireFinite(low_val, "ImageBuffer::fillHorizontalStep", "low_val");
+    requireFinite(high_val, "ImageBuffer::fillHorizontalStep", "high_val");
     if (empty()) return;
+    if (split_row > height_) {
+        throw std::out_of_range("ImageBuffer::fillHorizontalStep: split_row excede la altura H");
+    }
     const std::size_t split = (split_row == 0) ? (height_ / 2) : split_row;
     for (std::size_t i = 0; i < height_; ++i) {
         const float val = (i < split) ? low_val : high_val;
@@ -127,8 +160,10 @@ void ImageBuffer::fillHorizontalStep(float low_val, float high_val, std::size_t 
 }
 
 void ImageBuffer::fillRandom(unsigned int seed, float min_val, float max_val) {
-    if (!std::isfinite(min_val) || !std::isfinite(max_val) || min_val > max_val) {
-        throw std::invalid_argument("ImageBuffer::fillRandom: rango [min_val, max_val] inválido");
+    requireFinite(min_val, "ImageBuffer::fillRandom", "min_val");
+    requireFinite(max_val, "ImageBuffer::fillRandom", "max_val");
+    if (min_val > max_val) {
+        throw std::invalid_argument("ImageBuffer::fillRandom: min_val no puede ser mayor que max_val");
     }
     std::mt19937 rng(seed);
     std::uniform_real_distribution<float> dist(min_val, max_val);
@@ -162,28 +197,33 @@ void ImageBuffer::readPgm(const std::string& path) {
         throw std::runtime_error("ImageBuffer::readPgm: formato PGM no soportado (" + magic + "), se esperaba P2 o P5");
     }
 
+    // Leemos ancho, alto y maxval con signo para detectar valores negativos o cero explícitamente
     skipPgmCommentsAndWhitespace(in);
-    std::size_t w = 0;
-    in >> w;
+    long long w_signed = 0;
+    if (!(in >> w_signed) || w_signed <= 0) {
+        throw std::runtime_error("ImageBuffer::readPgm: ancho (width) inválido o no positivo en cabecera de " + path);
+    }
 
     skipPgmCommentsAndWhitespace(in);
-    std::size_t h = 0;
-    in >> h;
+    long long h_signed = 0;
+    if (!(in >> h_signed) || h_signed <= 0) {
+        throw std::runtime_error("ImageBuffer::readPgm: alto (height) inválido o no positivo en cabecera de " + path);
+    }
 
     skipPgmCommentsAndWhitespace(in);
     long long maxval = 0;
-    in >> maxval;
-
-    if (!in || w == 0 || h == 0 || maxval <= 0 || maxval > 65535) {
-        throw std::runtime_error("ImageBuffer::readPgm: cabecera PGM inválida en " + path);
+    if (!(in >> maxval) || maxval <= 0 || maxval > 65535) {
+        throw std::runtime_error("ImageBuffer::readPgm: maxval inválido (debe estar en [1, 65535]) en " + path);
     }
 
+    const std::size_t w = static_cast<std::size_t>(w_signed);
+    const std::size_t h = static_cast<std::size_t>(h_signed);
     const std::size_t total = checkedMultiplySize(h, w, "ImageBuffer::readPgm");
 
     // En formato binario P5 hay exactamente un carácter de espacio en blanco (ej. '\n') tras maxval
     const int sep = in.get();
-    if (sep == EOF) {
-        throw std::runtime_error("ImageBuffer::readPgm: archivo PGM truncado tras cabecera en " + path);
+    if (sep == EOF || !std::isspace(static_cast<unsigned char>(sep))) {
+        throw std::runtime_error("ImageBuffer::readPgm: separador inválido o archivo truncado tras cabecera en " + path);
     }
 
     std::vector<float> parsed(total, 0.0f);
@@ -194,10 +234,11 @@ void ImageBuffer::readPgm(const std::string& path) {
             skipPgmCommentsAndWhitespace(in);
             long long sample = 0;
             if (!(in >> sample)) {
-                throw std::runtime_error("ImageBuffer::readPgm: datos P2 truncados o inválidos en " + path);
+                throw std::runtime_error("ImageBuffer::readPgm: datos P2 truncados o no numéricos en " + path);
             }
             if (sample < 0 || sample > maxval) {
-                throw std::runtime_error("ImageBuffer::readPgm: muestra P2 fuera de rango [0, maxval] en " + path);
+                throw std::runtime_error("ImageBuffer::readPgm: muestra P2 (" + std::to_string(sample) +
+                                         ") fuera de rango [0, " + std::to_string(maxval) + "] en " + path);
             }
             parsed[idx] = static_cast<float>(sample) * inv_max;
         }
@@ -287,6 +328,10 @@ void ImageBuffer::writePgm(const std::string& path, bool binary, bool normalize_
 }
 
 void ImageBuffer::writeDat(const std::string& path) const {
+    if (empty()) {
+        throw std::runtime_error("ImageBuffer::writeDat: no se puede escribir una imagen vacía en " + path);
+    }
+
     std::ofstream out(path);
     if (!out) {
         throw std::runtime_error("ImageBuffer::writeDat: no se pudo abrir para escritura " + path);
@@ -317,23 +362,26 @@ void ImageBuffer::readDat(const std::string& path) {
         throw std::runtime_error("ImageBuffer::readDat: archivo vacío " + path);
     }
 
-    std::size_t h = 0;
-    std::size_t w = 0;
+    long long h_signed = 0;
+    long long w_signed = 0;
     {
         std::istringstream header(first_line);
         std::string hash_tok, h_label, w_label;
-        if (!(header >> hash_tok >> h_label >> h >> w_label >> w) ||
-            hash_tok != "#" || h_label != "height" || w_label != "width" || h == 0 || w == 0) {
-            throw std::runtime_error("ImageBuffer::readDat: cabecera inválida en " + path);
+        if (!(header >> hash_tok >> h_label >> h_signed >> w_label >> w_signed) ||
+            hash_tok != "#" || h_label != "height" || w_label != "width" ||
+            h_signed <= 0 || w_signed <= 0) {
+            throw std::runtime_error("ImageBuffer::readDat: cabecera inválida (dimensiones deben ser > 0) en " + path);
         }
     }
 
+    const std::size_t h = static_cast<std::size_t>(h_signed);
+    const std::size_t w = static_cast<std::size_t>(w_signed);
     const std::size_t total = checkedMultiplySize(h, w, "ImageBuffer::readDat");
     std::vector<float> parsed(total, 0.0f);
     for (std::size_t idx = 0; idx < total; ++idx) {
         skipPgmCommentsAndWhitespace(in);
         if (!(in >> parsed[idx]) || !std::isfinite(parsed[idx])) {
-            throw std::runtime_error("ImageBuffer::readDat: datos insuficientes o corruptos en " + path);
+            throw std::runtime_error("ImageBuffer::readDat: datos insuficientes, no numéricos o no finitos en " + path);
         }
     }
 

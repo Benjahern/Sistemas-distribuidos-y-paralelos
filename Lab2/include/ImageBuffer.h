@@ -136,10 +136,11 @@ public:
     void resize(std::size_t new_height, std::size_t new_width, float value = 0.0f);
 
     /**
-     * @brief Rellena toda la imagen con un valor constante.
+     * @brief Rellena toda la imagen con un valor constante finito.
      * @param value Valor constante a escribir en todos los píxeles.
+     * @throws std::invalid_argument si `value` es `NaN` o `Inf`.
      */
-    void fill(float value) noexcept;
+    void fill(float value);
 
     // =========================================================================
     // Generadores sintéticos deterministas (para tests de la Sección 9 y 11)

@@ -94,7 +94,7 @@ public:
     const float* row(std::size_t i) const noexcept;
 
     void resize(std::size_t new_height, std::size_t new_width, float value = 0.0f);
-    void fill(float value) noexcept;
+    void fill(float value);
 
     // Generadores sintéticos deterministas (Sección 9 y 11)
     void fillImpulse(std::size_t impulse_i, std::size_t impulse_j, float amplitude = 1.0f);
