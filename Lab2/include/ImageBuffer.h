@@ -26,9 +26,11 @@ public:
 
     /**
      * @brief Construye una imagen de dimensiones H (filas) x W (columnas) inicializada con un valor.
+     *        Si H == 0 o W == 0, el buffer queda vacío (0 x 0) de forma consistente.
      * @param height Número de filas (H).
      * @param width Número de columnas (W).
      * @param initial_value Valor inicial para todos los píxeles (por defecto 0.0f).
+     * @throws std::overflow_error si `height * width` desborda `std::size_t`.
      */
     ImageBuffer(std::size_t height, std::size_t width, float initial_value = 0.0f);
 
@@ -123,9 +125,13 @@ public:
 
     /**
      * @brief Redimensiona la imagen a `new_height x new_width` y asigna `value` a cada píxel.
+     *        Garantiza consistencia fuerte (strong exception safety): si `new_height == 0` o
+     *        `new_width == 0`, ambas dimensiones quedan en `0 x 0`; si falla la reserva o hay
+     *        desbordamiento, el buffer previo y sus dimensiones se mantienen intactos.
      * @param new_height Nueva cantidad de filas H.
      * @param new_width Nueva cantidad de columnas W.
      * @param value Valor a rellenar (por defecto 0.0f).
+     * @throws std::overflow_error si `new_height * new_width` desborda `std::size_t`.
      */
     void resize(std::size_t new_height, std::size_t new_width, float value = 0.0f);
 
@@ -209,8 +215,10 @@ public:
     /**
      * @brief Carga una imagen desde un archivo PGM (soporta tanto P2 ASCII como P5 binario).
      *        Normaliza automáticamente los píxeles leídos `[0, maxval]` al rango `float [0.0f, 1.0f]`.
+     *        Rechaza muestras fuera del rango `[0, maxval]`.
      * @param path Ruta del archivo `.pgm` de entrada.
-     * @throws std::runtime_error si el archivo no existe, no es P2/P5 válido o está truncado.
+     * @throws std::runtime_error si el archivo no existe, no es P2/P5 válido, contiene muestras
+     *         fuera de `[0, maxval]` o está truncado.
      */
     void readPgm(const std::string& path);
 
@@ -252,15 +260,21 @@ public:
      * @param s Lado impar del kernel (ej. 3, 5, 7).
      * @return Vector de tamaño `s * s` con los coeficientes del filtro.
      * @throws std::invalid_argument si `s < 1` o `s` es par.
+     * @throws std::overflow_error si `s * s` desborda `std::size_t`.
      */
     static std::vector<float> makeBoxKernel(int s);
 
     /**
      * @brief Construye un kernel cuadrado Gaussiano 2D de lado impar `s x s` normalizado (`sum k = 1.0f`).
+     *        Calcula los pesos en doble precisión (`double`) y los índices en `std::size_t` / `int64_t`
+     *        para evitar desbordamientos enteros con tamaños grandes y subdesbordamiento (underflow a 0)
+     *        con valores de `sigma` positivos muy pequeños.
      * @param s Lado impar del kernel (ej. 3, 5, 7).
-     * @param sigma Desviación estándar del filtro Gaussiano (por defecto `s / 3.0f`).
+     * @param sigma Desviación estándar del filtro Gaussiano (`0.0f` usa por defecto `s / 3.0f`;
+     *              valores negativos o no finitos lanzan `std::invalid_argument`).
      * @return Vector de tamaño `s * s` con los coeficientes normalizados.
-     * @throws std::invalid_argument si `s < 1`, `s` es par o `sigma <= 0`.
+     * @throws std::invalid_argument si `s < 1`, `s` es par, `sigma < 0.0f` o `sigma` no es finito.
+     * @throws std::overflow_error si `s * s` desborda `std::size_t`.
      */
     static std::vector<float> makeGaussianKernel(int s, float sigma = 0.0f);
 

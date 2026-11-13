@@ -3,7 +3,9 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <fstream>
 #include <iostream>
+#include <limits>
 #include <numeric>
 #include <stdexcept>
 
@@ -144,12 +146,105 @@ int main() {
     for (int s : {3, 5, 7}) {
         const auto k_box = ImageBuffer::makeBoxKernel(s);
         const auto k_gauss = ImageBuffer::makeGaussianKernel(s);
-        assert(k_box.size() == static_cast<std::size_t>(s * s));
-        assert(k_gauss.size() == static_cast<std::size_t>(s * s));
+        assert(k_box.size() == static_cast<std::size_t>(s) * static_cast<std::size_t>(s));
+        assert(k_gauss.size() == static_cast<std::size_t>(s) * static_cast<std::size_t>(s));
         const float sum_box = std::accumulate(k_box.begin(), k_box.end(), 0.0f);
         const float sum_gauss = std::accumulate(k_gauss.begin(), k_gauss.end(), 0.0f);
         assert(std::fabs(sum_box - 1.0f) < 1e-5f);
         assert(std::fabs(sum_gauss - 1.0f) < 1e-5f);
+    }
+
+    // 8. Verificación de correcciones del Rol 1:
+    // 8a. Desbordamiento en H * W (constructor y resize) y consistencia de dimensiones
+    {
+        ImageBuffer consistent(4, 5, 1.0f);
+        bool overflow_threw = false;
+        try {
+            consistent.resize(std::numeric_limits<std::size_t>::max(), 2, 0.0f);
+        } catch (const std::overflow_error&) {
+            overflow_threw = true;
+        }
+        assert(overflow_threw);
+        // Las dimensiones y datos previos deben permanecer intactos tras el fallo
+        assert(consistent.height() == 4 && consistent.width() == 5 && consistent.size() == 20);
+        assert(consistent(0, 0) == 1.0f);
+
+        // Si una sola dimensión es 0 (ej. resize(0, 10) o resize(10, 0)), ambas quedan en 0x0
+        consistent.resize(0, 10);
+        assert(consistent.empty() && consistent.height() == 0 && consistent.width() == 0 && consistent.size() == 0);
+
+        ImageBuffer zero_width(10, 0);
+        assert(zero_width.empty() && zero_width.height() == 0 && zero_width.width() == 0 && zero_width.size() == 0);
+    }
+
+    // 8b. Rechazo de muestras fuera de rango [0, maxval] en PGM (P2 y P5)
+    {
+        const std::string bad_p2 = "/tmp/lab2_test_bad_p2.pgm";
+        {
+            std::ofstream out(bad_p2);
+            out << "P2\n2 2\n100\n0 50 101 20\n"; // 101 > maxval(100)
+        }
+        ImageBuffer img_keep(3, 3, 0.5f);
+        bool bad_p2_threw = false;
+        try {
+            img_keep.readPgm(bad_p2);
+        } catch (const std::runtime_error&) {
+            bad_p2_threw = true;
+        }
+        assert(bad_p2_threw);
+        assert(img_keep.height() == 3 && img_keep.width() == 3); // Intacto
+        std::remove(bad_p2.c_str());
+
+        const std::string neg_p2 = "/tmp/lab2_test_neg_p2.pgm";
+        {
+            std::ofstream out(neg_p2);
+            out << "P2\n2 2\n255\n0 -1 10 20\n"; // -1 < 0
+        }
+        bool neg_p2_threw = false;
+        try {
+            img_keep.readPgm(neg_p2);
+        } catch (const std::runtime_error&) {
+            neg_p2_threw = true;
+        }
+        assert(neg_p2_threw);
+        std::remove(neg_p2.c_str());
+
+        const std::string bad_p5 = "/tmp/lab2_test_bad_p5.pgm";
+        {
+            std::ofstream out(bad_p5, std::ios::binary);
+            out << "P5\n2 2\n100\n";
+            const unsigned char raw[4] = {0, 50, 200, 20}; // 200 > maxval(100)
+            out.write(reinterpret_cast<const char*>(raw), 4);
+        }
+        bool bad_p5_threw = false;
+        try {
+            img_keep.readPgm(bad_p5);
+        } catch (const std::runtime_error&) {
+            bad_p5_threw = true;
+        }
+        assert(bad_p5_threw);
+        std::remove(bad_p5.c_str());
+    }
+
+    // 8c. Kernel gaussiano con sigma positivo muy pequeño (sin producir NaN) y rechazo de sigma negativo
+    {
+        for (float tiny_sigma : {1e-5f, 1e-20f, std::numeric_limits<float>::min()}) {
+            const auto k_tiny = ImageBuffer::makeGaussianKernel(5, tiny_sigma);
+            assert(k_tiny.size() == 25);
+            for (float v : k_tiny) {
+                assert(std::isfinite(v));
+            }
+            // Con sigma -> 0+, el peso se concentra en el coeficiente central (2, 2) -> índice 12
+            assert(std::fabs(k_tiny[12] - 1.0f) < 1e-5f);
+        }
+
+        bool neg_sigma_threw = false;
+        try {
+            (void)ImageBuffer::makeGaussianKernel(3, -0.5f);
+        } catch (const std::invalid_argument&) {
+            neg_sigma_threw = true;
+        }
+        assert(neg_sigma_threw);
     }
 
     std::cout << "[PASS] test_image_buffer (Rol 1): Todas las pruebas pasaron correctamente.\n";

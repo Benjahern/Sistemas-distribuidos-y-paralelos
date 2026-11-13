@@ -236,11 +236,11 @@ public:
   2. Debe aplicarse de forma idéntica en la referencia CPU serial (Rol 2) y en los kernels `naive` y `shared` (Rol 3).
 
 ### 4.3. Convención de Signos de la Convolución y Sobel
-Para un kernel cuadrado de lado impar $s = 2r + 1$ e índices locales $u, v \in \{-r, \dots, r\}$, tanto CPU como GPU deben evaluar:
+Para un kernel cuadrado de lado impar $s = 2r + 1$ e índices locales $u, v \in \{-r, \dots, r\}$, tanto CPU como GPU evalúan la convolución espacial verdadera de la Ecuación (1) del enunciado:
 
 $$\text{Out}(i, j) = \sum_{u=-r}^{r} \sum_{v=-r}^{r} k(u + r, v + r) \cdot I_{\text{pad}}(i - u, j - v)$$
 
-Es la ecuación (1) del PDF: el impulso centrado reproduce el kernel sin invertirlo. En un escalón ascendente vertical, el gradiente interior es `Gx = -4, Gy = 0`; en uno horizontal es `Gx = 0, Gy = -4`. Una implementación con `I(i+u,j+v)` debe reflejar los coeficientes. El Rol 3 debe mantener esta convención.
+Con esta convención (implementada en `convolveCpu` y verificada en `tests/`), un impulso unitario centrado reproduce exactamente el kernel $k$ sin reflejarlo, y sobre un escalón ascendente vertical u horizontal el gradiente interior toma `Gx = -4, Gy = 0` o `Gx = 0, Gy = -4` respectivamente. El Rol 3 debe mantener exactamente esta misma convención $I_{\text{pad}}(i - u, j - v)$ en los kernels GPU (`naive` y `shared`).
 
 Con los operadores de Sobel $3 \times 3$ fijos:
 
