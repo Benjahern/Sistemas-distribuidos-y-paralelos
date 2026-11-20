@@ -1,6 +1,8 @@
 #include "Sobel.h"
 
 #include <cmath>
+#include <stdexcept>
+#include <utility>
 
 /**
  * @file Sobel.cpp
@@ -46,15 +48,23 @@ void Sobel::computeMagnitudeCpu() {
     }
 }
 
-void Sobel::computeGxGyGpu(int /*variant*/) {
-    // TODO (Rol 3): Invocar Convolution2D::convolveGpu con SX y SY (3x3) y la variante dada
-    gx_gpu_.resize(input_.height(), input_.width(), 0.0f);
-    gy_gpu_.resize(input_.height(), input_.width(), 0.0f);
+void Sobel::computeGxGyGpu(int variant) {
+    Convolution2D convolution(input_);
+
+    convolution.convolveGpu(SX, 3, variant);
+    ImageBuffer gx = convolution.outputGpu();
+
+    convolution.convolveGpu(SY, 3, variant);
+    ImageBuffer gy = convolution.outputGpu();
+
+    gx_gpu_ = std::move(gx);
+    gy_gpu_ = std::move(gy);
 }
 
 #if !defined(__CUDACC__)
 void Sobel::computeMagnitudeGpu() {
-    // Stub cuando se compila sin nvcc
-    mag_gpu_.resize(input_.height(), input_.width(), 0.0f);
+    throw std::runtime_error(
+        "computeMagnitudeGpu: Compilacion sin soporte CUDA"
+    );
 }
 #endif
