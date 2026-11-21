@@ -407,6 +407,37 @@ void Convolution2D::convolveGpu(
 
 }
 
+// Benchmark/host-device entry point: launches the same kernels without owning
+// buffers or performing transfers, allowing Rol 4 to keep allocations resident.
+void benchmarkLaunchConvolution(const float* input, float* output,
+                                const float* coefficients, std::size_t height,
+                                std::size_t width, int s, int variant,
+                                unsigned int blockX, unsigned int blockY) {
+    if (input == nullptr || output == nullptr || coefficients == nullptr ||
+        height == 0 || width == 0 || s <= 0 || s % 2 == 0 ||
+        (variant != Convolution2D::VARIANT_NAIVE && variant != Convolution2D::VARIANT_SHARED) ||
+        blockX == 0 || blockY == 0 || height > static_cast<std::size_t>(INT_MAX) ||
+        width > static_cast<std::size_t>(INT_MAX)) {
+        throw std::invalid_argument("benchmarkLaunchConvolution: argumentos inválidos");
+    }
+    const dim3 block(blockX, blockY);
+    const dim3 grid((static_cast<unsigned int>(width) + blockX - 1) / blockX,
+                    (static_cast<unsigned int>(height) + blockY - 1) / blockY);
+    const std::size_t sharedBytes =
+        (static_cast<std::size_t>(blockX) + 2 * (s / 2)) *
+        (static_cast<std::size_t>(blockY) + 2 * (s / 2)) * sizeof(float);
+    if (variant == Convolution2D::VARIANT_NAIVE) {
+        convolveNaiveKernel<<<grid, block>>>(input, output, coefficients,
+                                             static_cast<int>(height),
+                                             static_cast<int>(width), s);
+    } else {
+        convolveSharedKernel<<<grid, block, sharedBytes>>>(
+            input, output, coefficients, static_cast<int>(height),
+            static_cast<int>(width), s);
+    }
+    CUDA_CHECK(cudaGetLastError());
+}
+
 #undef CUDA_CHECK
 
 #endif

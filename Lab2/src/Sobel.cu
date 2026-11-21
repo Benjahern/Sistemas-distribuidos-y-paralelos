@@ -167,6 +167,19 @@ void Sobel::computeMagnitudeGpu() {
     mag_gpu_ = result;
 }
 
+// Launches the existing magnitude kernel on resident device buffers.
+void benchmarkLaunchMagnitude(const float* gx, const float* gy, float* magnitude,
+                             std::size_t count) {
+    if (gx == nullptr || gy == nullptr || magnitude == nullptr || count == 0) {
+        throw std::invalid_argument("benchmarkLaunchMagnitude: argumentos inválidos");
+    }
+    constexpr unsigned int threads = 256;
+    const std::size_t neededBlocks = 1 + (count - 1) / threads;
+    const unsigned int blocks = static_cast<unsigned int>(neededBlocks > 1024 ? 1024 : neededBlocks);
+    magnitudeKernel<<<blocks, threads>>>(gx, gy, magnitude, count);
+    CUDA_CHECK(cudaGetLastError());
+}
+
 #undef CUDA_CHECK
 
 #endif

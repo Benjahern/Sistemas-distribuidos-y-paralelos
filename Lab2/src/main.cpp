@@ -49,7 +49,9 @@ void printUsage(const char* prog) {
               << "Comandos:\n"
               << "  demo [--input <imagen.pgm>] [--output <dir>] [--size <N>]\n"
               << "       Ejecuta el pipeline de Blur (s=3) y Sobel (G_x, G_y, G) y exporta\n"
-              << "       los archivos del panel Sobel y cpu_gpu_error.dat en <dir> (por defecto results/).\n";
+              << "       los archivos del panel Sobel y cpu_gpu_error.dat en <dir> (por defecto results/).\n"
+              << "  benchmark [--output <dir>] [--repetitions <N>]\n"
+              << "       Ejecuta la matriz Rol 4 (requiere CUDA/GPU; mínimo 10 repeticiones).\n";
 }
 
 } // namespace
@@ -60,6 +62,7 @@ int main(int argc, char** argv) {
         std::string input_pgm;
         std::string output_dir = "results";
         std::size_t size = 128;
+        int repetitions = 10;
 
         for (int i = 2; i < argc; ++i) {
             const std::string arg = argv[i];
@@ -69,6 +72,8 @@ int main(int argc, char** argv) {
                 output_dir = argv[++i];
             } else if (arg == "--size" && i + 1 < argc) {
                 size = static_cast<std::size_t>(std::stoul(argv[++i]));
+            } else if (arg == "--repetitions" && i + 1 < argc) {
+                repetitions = std::stoi(argv[++i]);
             } else if (arg == "--help" || arg == "-h") {
                 printUsage(argv[0]);
                 return 0;
@@ -81,8 +86,12 @@ int main(int argc, char** argv) {
             printUsage(argv[0]);
             return 0;
         }
+        if (mode == "benchmark") {
+            Benchmark{}.runSuite(output_dir, repetitions);
+            return 0;
+        }
         if (mode != "demo") {
-            throw std::invalid_argument("Modo no soportado: " + mode + " (use 'demo')");
+            throw std::invalid_argument("Modo no soportado: " + mode + " (use 'demo' o 'benchmark')");
         }
 
         ImageBuffer img;
@@ -139,4 +148,3 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
-

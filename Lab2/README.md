@@ -53,8 +53,8 @@ En conformidad con la **Sección 3 del enunciado**, para un equipo de 4 integran
 | :--- | :--- | :--- | :--- |
 | **1. Imagen y I/O** | Mateo Valle (Rol 1 + 5) | `include/ImageBuffer.h`, `src/ImageBuffer.cpp` | **Implementado completo.** Gestión del buffer host $(H \times W)$ en `float` (*row-major*), lectura/escritura PGM (`P2`/`P5`) y `.dat`, normalización a $[0, 1]$ y generación determinista con semilla fija para todos los tamaños ($8^2, 16^2, 32^2, 512^2, 1024^2, 2048^2, 4096^2$). |
 | **2. Convolución CPU** | Nicolás Sarabia | `include/Convolution2D.h`, `src/Convolution2D.cpp`, `include/Sobel.h`, `src/Sobel.cpp` | **Implementado y validado localmente en CPU.** Referencia serial pura en CPU para convolución 2D bajo política *Zero-padding*, cálculo de $G_x, G_y, G$ reutilizando `convolveCpu`. |
-| **3. Kernels CUDA** | Integrante Rol 3 | `src/Convolution2D.cu`, `src/Sobel.cu`, `include/Metrics.h`, `src/Metrics.cu` | **Stub / Contrato listo.** Kernels `naive` y `shared` (con *tile* + halo y `__syncthreads()`), función auxiliar `__device__`, `CUDA_CHECK`, reducción en `__shared__` vs `atomicAdd`. |
-| **4. Host/Device y Benchmarks** | Integrante Rol 4 | `include/Benchmark.h`, `src/Benchmark.cpp` | **Stub / Contrato listo.** Gestión de memoria device, mediciones *kernel-only* vs *end-to-end*, barrido de bloques 2D, Ley de Amdahl y generación de `benchmark_results.dat` y `block_study.dat`. |
+| **3. Kernels CUDA** | Integrante Rol 3 | `src/Convolution2D.cu`, `src/Sobel.cu`, `include/Metrics.h`, `src/Metrics.cu` | **Implementado en `rol3-lab2`; verificación CUDA pendiente en entorno con `nvcc` y GPU.** Kernels `naive` y `shared`, Sobel y reducciones. |
+| **4. Host/Device y Benchmarks** | Integrante Rol 4 | `include/Benchmark.h`, `src/Benchmark.cpp` | **Implementado; validación real CUDA pendiente.** Buffers RAII, ejecuciones residentes, mediciones, barrido, estadísticas y archivos `.dat`. |
 | **5. Calidad, CI y Visualización** | Mateo Valle (Rol 1 + 5) | `include/Visualizer.h`, `src/Visualizer.cpp`, `tests/`, `scripts/plot_results.py`, `Dockerfile`, `.github/workflows/` | **Implementado completo.** Suite de pruebas (`make test`), manejo de CI sin GPU física, contenedor Docker con CUDA, exportación de `cpu_gpu_error.dat` y generación de `sobel_panel.png` y `performance_plots.png`. |
 
 > **Nota sobre separación de interfaces entre Rol 1 y Rol 5:**
@@ -62,7 +62,7 @@ En conformidad con la **Sección 3 del enunciado**, para un equipo de 4 integran
 > * `Visualizer` y `tests/` (Rol 5) consumen la API pública de `ImageBuffer`, `Convolution2D`, `Sobel` y `Metrics` sin acceder a detalles internos de almacenamiento.
 >
 > **Nota de coordinación con Roles 2, 3 y 4:**
-> * Las rutas CPU de `Convolution2D.cpp` y `Sobel.cpp` están implementadas. Las rutas GPU y `Benchmark.cpp` siguen como stubs de los Roles 3 y 4; un CI verde no certifica esas implementaciones pendientes.
+> * Las rutas CPU y la implementación CUDA se encuentran en el repositorio. El fallback CPU de CI no valida la compilación ni la ejecución CUDA; eso debe verificarse en un entorno con toolkit CUDA y GPU.
 
 ---
 
@@ -293,10 +293,13 @@ make test
 # 3. Ejecutar demostración (genera los archivos .dat y .pgm del panel Sobel en results/)
 make demo
 
-# 4. Generar las figuras PNG (sobel_panel.png y performance_plots.png) en results/
+# 4. Ejecutar la matriz de Rol 4 (solo en entorno CUDA/GPU; mínimo 10 repeticiones)
+build/image_cuda benchmark --output results --repetitions 10
+
+# 5. Generar las figuras PNG (sobel_panel.png y performance_plots.png) en results/
 make plots
 
-# 5. Limpiar binarios y objetos de compilación
+# 6. Limpiar binarios y objetos de compilación
 make clean
 ```
 
@@ -310,8 +313,9 @@ Siguiendo la **Sección 11 del enunciado**:
    * El workflow `docker-lab2.yml` construye la imagen Docker basada en `nvidia/cuda:12.4.1-devel-ubuntu22.04`, ejecutando un **smoke build real con `nvcc`** de todos los archivos `.cpp` y `.cu`.
    * Al correr `make test`, el binario ejecuta todos los tests unitarios de `ImageBuffer` (Rol 1) y `Visualizer` (Rol 5), y verifica dinámicamente el estado de los Roles 2 y 3 y la presencia de GPU mediante `Convolution2D::isGpuAvailable()`.
    * Si `cudaGetDeviceCount` detecta `0` dispositivos físicos en el runner de CI, las pruebas que requieren lanzar kernels en hardware se reportan explícitamente como `[SKIPPED - No GPU device available in CI]` sin hacer fallar el pipeline.
-2. **En la Partición GPU del Clúster DIINF (`sbatch benchmark-gpu.slurm`):**
-   * `Convolution2D::isGpuAvailable()` retorna `true` y, una vez integrados los Roles 2, 3 y 4, `make test` ejecuta **todas** las pruebas en hardware GPU real (incluyendo equivalencia numérica CPU vs. GPU Naive vs. GPU Shared en $8^2, 16^2, 32^2$, reducción `__shared__` vs. `atomicAdd` y test de perímetro en GPU), además de los benchmarks finales.
+ 2. **En la partición GPU del clúster DIINF:**
+    * `Convolution2D::isGpuAvailable()` debe retornar `true`; correr `make test` y luego `build/image_cuda benchmark --output results --repetitions 10` bajo Slurm. Las salidas finales deben provenir de esa ejecución. La ejecución y evidencias Slurm corresponden al Rol 5.
+    * `benchmark_results.dat` agrega las cuatro geometrías requeridas por punto porque el formato acordado no incluye columnas para el bloque. `block_study.dat` conserva cada geometría para blur $s=3$; ambos formatos mantienen las columnas que consume `scripts/plot_results.py`.
 
 
 ## Referencia CPU del Rol 2

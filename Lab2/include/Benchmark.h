@@ -2,7 +2,33 @@
 
 #include "Convolution2D.h"
 #include "ImageBuffer.h"
+#include <cstddef>
 #include <string>
+
+/** Move-only RAII owner for a linear CUDA device buffer. */
+class DeviceBuffer {
+public:
+    DeviceBuffer() = default;
+    explicit DeviceBuffer(std::size_t bytes) { allocate(bytes); }
+    ~DeviceBuffer();
+
+    DeviceBuffer(const DeviceBuffer&) = delete;
+    DeviceBuffer& operator=(const DeviceBuffer&) = delete;
+    DeviceBuffer(DeviceBuffer&& other) noexcept;
+    DeviceBuffer& operator=(DeviceBuffer&& other) noexcept;
+
+    void allocate(std::size_t bytes);
+    void reset() noexcept;
+    void* data() noexcept { return ptr_; }
+    const void* data() const noexcept { return ptr_; }
+    std::size_t size() const noexcept { return bytes_; }
+    void copyFromHost(const void* source, std::size_t bytes);
+    void copyToHost(void* destination, std::size_t bytes) const;
+
+private:
+    void* ptr_{nullptr};
+    std::size_t bytes_{0};
+};
 
 /**
  * @file Benchmark.h
@@ -53,5 +79,7 @@ public:
      * @param repetitions Número de repeticiones (mínimo 10).
      */
     void compareCpuGpu(const ImageBuffer& img, const float* k, int s, int repetitions = 10);
-};
 
+    /** Ejecuta la matriz de experimentos del laboratorio y escribe los dos .dat obligatorios. */
+    void runSuite(const std::string& outputDirectory = "results", int repetitions = 10);
+};
