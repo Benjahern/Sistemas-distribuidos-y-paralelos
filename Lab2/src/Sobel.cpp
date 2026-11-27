@@ -1,13 +1,15 @@
 #include "Sobel.h"
 
+#include <cmath>
+#include <stdexcept>
+#include <utility>
+
 /**
  * @file Sobel.cpp
- * @brief Stub de integración para Rol 2 (`computeGxGyCpu`, `computeMagnitudeCpu`)
+ * @brief Implementación serial del Rol 2 (`computeGxGyCpu`, `computeMagnitudeCpu`)
  *        y delegación de `computeGxGyGpu` (Rol 3).
  *
- * NOTA DE EQUIPO:
- * La implementación de los gradientes de Sobel reutilizando `Convolution2D` y el cálculo
- * de la magnitud `G = sqrt(G_x^2 + G_y^2)` en CPU corresponden al **Rol 2**.
+ * Gradientes mediante la convolución genérica; magnitud como map punto a punto.
  */
 
 Sobel::Sobel(const ImageBuffer& input)
@@ -30,25 +32,39 @@ void Sobel::setInput(const ImageBuffer& input) {
 }
 
 void Sobel::computeGxGyCpu() {
-    // TODO (Rol 2): Invocar Convolution2D::convolveCpu con SX y SY (3x3)
-    gx_cpu_.resize(input_.height(), input_.width(), 0.0f);
-    gy_cpu_.resize(input_.height(), input_.width(), 0.0f);
+    Convolution2D convolution(input_);
+    convolution.convolveCpu(SX, 3);
+    gx_cpu_ = convolution.outputCpu();
+    convolution.convolveCpu(SY, 3);
+    gy_cpu_ = convolution.outputCpu();
 }
 
 void Sobel::computeMagnitudeCpu() {
-    // TODO (Rol 2): Calcular G(i,j) = sqrt(G_x(i,j)^2 + G_y(i,j)^2) en CPU
     mag_cpu_.resize(input_.height(), input_.width(), 0.0f);
+    for (std::size_t index = 0; index < input_.size(); ++index) {
+        const float gx = gx_cpu_.data()[index];
+        const float gy = gy_cpu_.data()[index];
+        mag_cpu_.data()[index] = std::sqrt(gx * gx + gy * gy);
+    }
 }
 
-void Sobel::computeGxGyGpu(int /*variant*/) {
-    // TODO (Rol 3): Invocar Convolution2D::convolveGpu con SX y SY (3x3) y la variante dada
-    gx_gpu_.resize(input_.height(), input_.width(), 0.0f);
-    gy_gpu_.resize(input_.height(), input_.width(), 0.0f);
+void Sobel::computeGxGyGpu(int variant) {
+    Convolution2D convolution(input_);
+
+    convolution.convolveGpu(SX, 3, variant);
+    ImageBuffer gx = convolution.outputGpu();
+
+    convolution.convolveGpu(SY, 3, variant);
+    ImageBuffer gy = convolution.outputGpu();
+
+    gx_gpu_ = std::move(gx);
+    gy_gpu_ = std::move(gy);
 }
 
 #if !defined(__CUDACC__)
 void Sobel::computeMagnitudeGpu() {
-    // Stub cuando se compila sin nvcc
-    mag_gpu_.resize(input_.height(), input_.width(), 0.0f);
+    throw std::runtime_error(
+        "computeMagnitudeGpu: Compilacion sin soporte CUDA"
+    );
 }
 #endif

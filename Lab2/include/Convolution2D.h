@@ -23,9 +23,9 @@ struct dim3 {
  * Convenciones acordadas para todo el laboratorio (documentadas en README.md):
  * - Notación: `s = 2r + 1` es el lado impar del kernel; `k` apunta a los `s * s` coeficientes en row-major.
  * - Política de borde única: **Zero-padding** (fuera de `[0, H) x [0, W)` se lee `0.0f`).
- * - Fórmula espacial (correlación/convolución indexada con desplazamiento directo):
- *   `Out(i, j) = sum_{u=-r}^{r} sum_{v=-r}^{r} k[(u + r)*s + (v + r)] * I_pad(i + u, j + v)`
- *   (Documentada de forma idéntica para CPU serial, GPU naive y GPU shared).
+ * - Convolución espacial (ecuación 1 del enunciado):
+ *   `Out(i, j) = sum_{u=-r}^{r} sum_{v=-r}^{r} k[(u + r)*s + (v + r)] * I_pad(i - u, j - v)`
+ *   Las futuras variantes GPU naive y shared deben usar esta misma convención.
  */
 class Convolution2D {
 public:
@@ -73,6 +73,8 @@ public:
      * @brief Referencia serial en CPU para la convolución 2D con política de borde Zero-padding.
      * @param k Puntero a los `s * s` coeficientes del kernel en orden row-major.
      * @param s Lado impar del kernel (`s = 2r + 1`, ej. 3, 5, 7).
+     * @throws std::invalid_argument Si k es nulo o s no es impar positivo.
+     * @note El llamador proporciona al menos s*s coeficientes. Una entrada vacía produce salida vacía.
      */
     void convolveCpu(const float* k, int s);
 
